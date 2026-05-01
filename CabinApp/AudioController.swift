@@ -1,171 +1,130 @@
 // AudioController.swift
-// Manages the Cabin audio environment using AVAudioEngine.
-// Each CabinPhase has a corresponding audio bed (loop) with a
-// convolution reverb insert — simulating the acoustic signature
-// of a wide-body cabin.
-//
-// Audio beds (referenced by filename, to be added to Xcode bundle):
-//   cabin_ground_power.caf  — boarding / pre-departure hum
-//   cabin_taxi.caf          — engine idle + tarmac roll
-//   cabin_takeoff.caf       — engine spool-up (one-shot, then crossfade to cruise)
-//   cabin_cruise.caf        — steady white-noise jet hum (loop)
-//   cabin_galley.caf        — break phase: muffled chatter + cart clinks
-//   cabin_descent.caf       — engine reduction + PA prompts
-//   cabin_landing.caf       — gear thud + reverse thrust + rollout
-//
-// Convolution IR:
-//   ir_wide_body_cabin.wav  — measured cabin impulse response
+// Spatial cabin sound controller.
+// Uses AVAudioEngine with multiple AVAudioPlayerNodes:
+//   - engine hum loop
+//   - air vent hiss loop
+//   - boarding ambience loop
+//   - one-shot chimes / tray table / meal clinks / PA
 
+import Foundation
+import SwiftUI
 import AVFoundation
-import Combine
 
 @MainActor
 final class AudioController: ObservableObject {
 
-    // MARK: - Engine
-    private let engine          = AVAudioEngine()
-    private let reverb          = AVAudioUnitReverb()
-    private var players:        [String: AVAudioPlayerNode] = [:]
-    private var currentBed:     String = ""
-    private let mixer           = AVAudioMixerNode()
-    private var crossfadeCancellable: AnyCancellable?
+    private let engine = AVAudioEngine()
 
-    // MARK: - Phase → audio bed mapping
-    private let phaseBedMap: [CabinPhase: String] = [
-        .boarding:     "cabin_ground_power",
-        .preDeparture: "cabin_ground_power",
-        .taxi:         "cabin_taxi",
-        .takeoff:      "cabin_takeoff",
-        .cruise:       "cabin_cruise",
-        .breakPhase:   "cabin_galley",
-        .descent:      "cabin_descent",
-        .landing:      "cabin_landing",
-        .gateArrival:  "cabin_ground_power"
-    ]
+    private let engineHumNode = AVAudioPlayerNode()
+    private let ventNode      = AVAudioPlayerNode()
+    private let ambienceNode  = AVAudioPlayerNode()
+    private let sfxNode       = AVAudioPlayerNode()
 
-    // MARK: - Init
+    private var hasStartedEngine = false
+
     init() {
-        configureAudioSession()
-        buildGraph()
-        start()
+        configureGraph()
     }
 
-    // MARK: - Audio session
+    private func configureGraph() {
+        [engineHumNode, ventNode, ambienceNode, sfxNode].forEach { engine.attach($0) }
 
-    private func configureAudioSession() {
-#if os(iOS)
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-        try? session.setActive(true)
-#endif
-    }
+        let mainMixer = engine.mainMixerNode
+        engine.connect(engineHumNode, to: mainMixer, format: nil)
+        engine.connect(ventNode,      to: mainMixer, format: nil)
+        engine.connect(ambienceNode,  to: mainMixer, format: nil)
+        engine.connect(sfxNode,       to: mainMixer, format: nil)
 
-    // MARK: - Graph construction
+        mainMixer.outputVolume = 0.92
 
-    private func buildGraph() {
-        // Attach mixer and reverb.
-        engine.attach(mixer)
-        engine.attach(reverb)
-
-        // Configure reverb — large room to simulate fuselage.
-        reverb.loadFactoryPreset(.largeChamber)
-        reverb.wetDryMix = 18  // 18% wet — subtle cabin bloom.
-
-        // Chain: mixer → reverb → mainMixerNode → output
-        engine.connect(mixer, to: reverb, format: nil)
-        engine.connect(reverb, to: engine.mainMixerNode, format: nil)
-
-        // Pre-create a player for each audio bed.
-        let beds = [
-            "cabin_ground_power", "cabin_taxi", "cabin_takeoff",
-            "cabin_cruise", "cabin_galley", "cabin_descent", "cabin_landing"
-        ]
-        for bed in beds {
-            let player = AVAudioPlayerNode()
-            engine.attach(player)
-            engine.connect(player, to: mixer, format: nil)
-            players[bed] = player
+        do {
+            try engine.start()
+            hasStartedEngine = true
+        } catch {
+            print("[AudioController] Failed to start AVAudioEngine: \(error)")
         }
     }
 
-    private func start() {
-        try? engine.start()
+    // MARK: - Scene state transitions
+
+    func beginBoardingAudio() {
+        ensureEngineRunning()
+        playLoop(named: "boarding_ambience", on: ambienceNode, volume: 0.22)
+        playLoop(named: "cabin_hum", on: engineHumNode, volume: 0.18)
     }
 
-    // MARK: - Phase transitions
-
-    func transitionToPhase(_ phase: CabinPhase) {
-        guard let newBed = phaseBedMap[phase], newBed != currentBed else { return }
-        crossfade(from: currentBed, to: newBed, duration: 2.0)
-        currentBed = newBed
+    func beginTaxiAudio() {
+        ensureEngineRunning()
+        playLoop(named: "engine_spool", on: engineHumNode, volume: 0.38)
+        playLoop(named: "vent_hiss", on: ventNode, volume: 0.12)
+        playOneShot(named: "seatbelt_ding")
     }
 
-    // MARK: - Crossfade
+    func beginCruiseAudio() {
+        ensureEngineRunning()
+        playLoop(named: "engine_cruise", on: engineHumNode, volume: 0.30)
+        playLoop(named: "vent_hiss", on: ventNode, volume: 0.14)
+    }
 
-    private func crossfade(from oldBed: String, to newBed: String, duration: TimeInterval) {
-        guard let newPlayer = players[newBed] else { return }
-        let oldPlayer = players[oldBed]
+    func beginDescentAudio() {
+        ensureEngineRunning()
+        playOneShot(named: "pa_prepare_arrival")
+        playOneShot(named: "gear_thud")
+    }
 
-        // Schedule new bed.
-        if let url = Bundle.main.url(forResource: newBed, withExtension: "caf") {
-            if let file = try? AVAudioFile(forReading: url) {
-                // Loop all beds except one-shots (takeoff, landing).
-                let loops = (newBed != "cabin_takeoff" && newBed != "cabin_landing")
-                newPlayer.scheduleFile(file, at: nil, completionHandler: loops ? { [weak self, weak newPlayer] in
-                    guard let self, let newPlayer else { return }
-                    Task { @MainActor in self.loopPlayer(newPlayer, file: file) }
-                } : nil)
-                newPlayer.play()
-                newPlayer.volume = 0
+    // MARK: - UI SFX
+
+    func playIFETap() {
+        playOneShot(named: "ife_tap")
+    }
+
+    func playTrayClunk() {
+        playOneShot(named: "tray_clunk")
+    }
+
+    func playMealService() {
+        playOneShot(named: "meal_clink")
+    }
+
+    // MARK: - Internal helpers
+
+    private func ensureEngineRunning() {
+        guard !engine.isRunning else { return }
+        do {
+            try engine.start()
+        } catch {
+            print("[AudioController] Restart AVAudioEngine failed: \(error)")
+        }
+    }
+
+    private func playLoop(named name: String, on node: AVAudioPlayerNode, volume: Float) {
+        guard let file = loadAudioFile(named: name) else { return }
+        if node.isPlaying { node.stop() }
+        node.volume = volume
+        node.scheduleFile(file, at: nil, completionHandler: nil)
+        node.play()
+
+        // Re-schedule in a simple loop. In production, use completion chaining.
+        DispatchQueue.main.asyncAfter(deadline: .now() + file.duration * 0.95) { [weak self, weak node] in
+            guard let self, let node, node.isPlaying else { return }
+            self.playLoop(named: name, on: node, volume: volume)
+        }
+    }
+
+    private func playOneShot(named name: String, volume: Float = 0.85) {
+        guard let file = loadAudioFile(named: name) else { return }
+        sfxNode.volume = volume
+        sfxNode.scheduleFile(file, at: nil)
+        if !sfxNode.isPlaying { sfxNode.play() }
+    }
+
+    private func loadAudioFile(named name: String) -> AVAudioFile? {
+        let exts = ["wav", "aif", "aiff", "mp3", "m4a"]
+        for ext in exts {
+            if let url = Bundle.main.url(forResource: name, withExtension: ext) {
+                return try? AVAudioFile(forReading: url)
             }
         }
-
-        // Animate volumes over `duration` seconds at 60fps cadence.
-        let steps = Int(duration * 60)
-        for i in 0...steps {
-            let t = Double(i) / Double(steps)
-            let delay = t * duration
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self else { return }
-                newPlayer.volume = Float(t)
-                oldPlayer?.volume = Float(1 - t)
-            }
-        }
-
-        // Stop old player after fade.
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.1) {
-            oldPlayer?.stop()
-        }
-    }
-
-    private func loopPlayer(_ player: AVAudioPlayerNode, file: AVAudioFile) {
-        try? file.framePosition = 0
-        player.scheduleFile(file, at: nil, completionHandler: { [weak self, weak player] in
-            guard let self, let player else { return }
-            Task { @MainActor in self.loopPlayer(player, file: file) }
-        })
-        if !player.isPlaying { player.play() }
-    }
-
-    // MARK: - One-shot SFX
-
-    func playSFX(named name: String, volume: Float = 1.0) {
-        guard
-            let url = Bundle.main.url(forResource: name, withExtension: "caf"),
-            let file = try? AVAudioFile(forReading: url)
-        else { return }
-
-        let sfxPlayer = AVAudioPlayerNode()
-        engine.attach(sfxPlayer)
-        engine.connect(sfxPlayer, to: mixer, format: nil)
-        sfxPlayer.volume = volume
-        sfxPlayer.scheduleFile(file, at: nil) { [weak self, weak sfxPlayer] in
-            guard let self, let sfxPlayer else { return }
-            Task { @MainActor in
-                sfxPlayer.stop()
-                self.engine.detach(sfxPlayer)
-            }
-        }
-        sfxPlayer.play()
+        return nil
     }
 }
