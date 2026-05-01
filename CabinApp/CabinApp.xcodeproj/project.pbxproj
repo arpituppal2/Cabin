@@ -1,0 +1,404 @@
+// !$*UTF8*$!
+// CabinApp.xcodeproj/project.pbxproj
+// Hand-authored Xcode project file wiring the CabinApp SwiftUI target.
+// Open with: open CabinApp/CabinApp.xcodeproj
+//
+// Source files included in this target:
+//   CabinApp.swift
+//   ContentView.swift
+//   SessionEngine.swift
+//   IFEView.swift
+//   MetalBridge.swift
+//   AudioController.swift
+//   GestureRouter.swift
+//   OnboardingView.swift
+//
+// Frameworks:
+//   SwiftUI, Combine, AVFoundation, CoreMotion, MetalKit, Metal
+//   GameController (for MFi controller fallback)
+//
+// Deployment target: iPadOS 17.0
+// Swift version: 5.10
+// Architectures: arm64 (Apple Silicon iPad + M-series)
+
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* ─── Build configuration list for PBXProject ─── */
+		001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1540;
+				LastUpgradeCheck = 1540;
+				ORGANIZATIONNAME = "Cabin";
+				TargetAttributes = {
+					TGT_APP /* CabinApp */ = {
+						CreatedOnToolsVersion = 15.4;
+					};
+				};
+			};
+			buildConfigurationList = BCLST_PROJECT;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = GRP_ROOT;
+			productRefGroup = GRP_PRODUCTS;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				TGT_APP,
+			);
+		};
+
+/* ─── Groups ─── */
+		GRP_ROOT = {
+			isa = PBXGroup;
+			children = (
+				GRP_SOURCES,
+				GRP_RESOURCES,
+				GRP_FRAMEWORKS,
+				GRP_PRODUCTS,
+			);
+			sourceTree = "<group>";
+		};
+
+		GRP_SOURCES = {
+			isa = PBXGroup;
+			children = (
+				FILE_CabinApp,
+				FILE_ContentView,
+				FILE_SessionEngine,
+				FILE_IFEView,
+				FILE_MetalBridge,
+				FILE_AudioController,
+				FILE_GestureRouter,
+				FILE_OnboardingView,
+			);
+			name = "CabinApp Sources";
+			sourceTree = "<group>";
+			path = "..";
+		};
+
+		GRP_RESOURCES = {
+			isa = PBXGroup;
+			children = (
+				FILE_InfoPlist,
+				FILE_LaunchScreen,
+			);
+			name = "Resources";
+			sourceTree = "<group>";
+			path = "..";
+		};
+
+		GRP_FRAMEWORKS = {
+			isa = PBXGroup;
+			children = (
+				FW_SwiftUI,
+				FW_AVFoundation,
+				FW_CoreMotion,
+				FW_MetalKit,
+				FW_Metal,
+				FW_GameController,
+				FW_Combine,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+
+		GRP_PRODUCTS = {
+			isa = PBXGroup;
+			children = (
+				PROD_APP,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+
+/* ─── File references ─── */
+		FILE_CabinApp       = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CabinApp.swift;        sourceTree = "<group>"; };
+		FILE_ContentView    = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift;     sourceTree = "<group>"; };
+		FILE_SessionEngine  = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionEngine.swift;   sourceTree = "<group>"; };
+		FILE_IFEView        = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IFEView.swift;         sourceTree = "<group>"; };
+		FILE_MetalBridge    = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalBridge.swift;     sourceTree = "<group>"; };
+		FILE_AudioController= { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioController.swift; sourceTree = "<group>"; };
+		FILE_GestureRouter  = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GestureRouter.swift;   sourceTree = "<group>"; };
+		FILE_OnboardingView = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift;  sourceTree = "<group>"; };
+		FILE_InfoPlist      = { isa = PBXFileReference; lastKnownFileType = text.plist.xml;   path = Info.plist;            sourceTree = "<group>"; };
+		FILE_LaunchScreen   = { isa = PBXFileReference; lastKnownFileType = file.storyboard;  path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+
+/* ─── Framework references (SDK) ─── */
+		FW_SwiftUI        = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework;        path = System/Library/Frameworks/SwiftUI.framework;        sourceTree = SDKROOT; };
+		FW_AVFoundation   = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework;   path = System/Library/Frameworks/AVFoundation.framework;   sourceTree = SDKROOT; };
+		FW_CoreMotion     = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMotion.framework;     path = System/Library/Frameworks/CoreMotion.framework;     sourceTree = SDKROOT; };
+		FW_MetalKit       = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework;       path = System/Library/Frameworks/MetalKit.framework;       sourceTree = SDKROOT; };
+		FW_Metal          = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework;          path = System/Library/Frameworks/Metal.framework;          sourceTree = SDKROOT; };
+		FW_GameController = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
+		FW_Combine        = { isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Combine.framework;        path = System/Library/Frameworks/Combine.framework;        sourceTree = SDKROOT; };
+
+/* ─── Product ─── */
+		PROD_APP = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = CabinApp.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+
+/* ─── Build files (source) ─── */
+		BF_CabinApp        = { isa = PBXBuildFile; fileRef = FILE_CabinApp;        };
+		BF_ContentView     = { isa = PBXBuildFile; fileRef = FILE_ContentView;     };
+		BF_SessionEngine   = { isa = PBXBuildFile; fileRef = FILE_SessionEngine;   };
+		BF_IFEView         = { isa = PBXBuildFile; fileRef = FILE_IFEView;         };
+		BF_MetalBridge     = { isa = PBXBuildFile; fileRef = FILE_MetalBridge;     };
+		BF_AudioController = { isa = PBXBuildFile; fileRef = FILE_AudioController; };
+		BF_GestureRouter   = { isa = PBXBuildFile; fileRef = FILE_GestureRouter;   };
+		BF_OnboardingView  = { isa = PBXBuildFile; fileRef = FILE_OnboardingView;  };
+
+/* ─── Build files (resources) ─── */
+		BF_LaunchScreen = { isa = PBXBuildFile; fileRef = FILE_LaunchScreen; };
+
+/* ─── Build files (frameworks) ─── */
+		BF_FW_SwiftUI        = { isa = PBXBuildFile; fileRef = FW_SwiftUI;        };
+		BF_FW_AVFoundation   = { isa = PBXBuildFile; fileRef = FW_AVFoundation;   };
+		BF_FW_CoreMotion     = { isa = PBXBuildFile; fileRef = FW_CoreMotion;     };
+		BF_FW_MetalKit       = { isa = PBXBuildFile; fileRef = FW_MetalKit;       };
+		BF_FW_Metal          = { isa = PBXBuildFile; fileRef = FW_Metal;          };
+		BF_FW_GameController = { isa = PBXBuildFile; fileRef = FW_GameController; };
+		BF_FW_Combine        = { isa = PBXBuildFile; fileRef = FW_Combine;        };
+
+/* ─── Build phases ─── */
+		BP_SOURCES = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF_CabinApp,
+				BF_ContentView,
+				BF_SessionEngine,
+				BF_IFEView,
+				BF_MetalBridge,
+				BF_AudioController,
+				BF_GestureRouter,
+				BF_OnboardingView,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		BP_FRAMEWORKS = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF_FW_SwiftUI,
+				BF_FW_AVFoundation,
+				BF_FW_CoreMotion,
+				BF_FW_MetalKit,
+				BF_FW_Metal,
+				BF_FW_GameController,
+				BF_FW_Combine,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+		BP_RESOURCES = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF_LaunchScreen,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+/* ─── Target ─── */
+		TGT_APP = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BCLST_TARGET;
+			buildPhases = (
+				BP_SOURCES,
+				BP_FRAMEWORKS,
+				BP_RESOURCES,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = CabinApp;
+			productName = CabinApp;
+			productReference = PROD_APP;
+			productType = "com.apple.product-type.application";
+		};
+
+/* ─── Build configurations ─── */
+		BC_PROJECT_DEBUG = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_CYCLE = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_DECL = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)");
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+
+		BC_PROJECT_RELEASE = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+
+		BC_TARGET_DEBUG = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASAR_ENABLE = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.cabin.app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_INSTALLED_PRODUCT = NO;
+				SUPPORTED_PLATFORMS = iphonesimulator iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2; /* iPad only */
+			};
+			name = Debug;
+		};
+
+		BC_TARGET_RELEASE = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASAR_ENABLE = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.cabin.app";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_INSTALLED_PRODUCT = YES;
+				SUPPORTED_PLATFORMS = iphonesimulator iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2; /* iPad only */
+			};
+			name = Release;
+		};
+
+/* ─── Build configuration lists ─── */
+		BCLST_PROJECT = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC_PROJECT_DEBUG,
+				BC_PROJECT_RELEASE,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+		BCLST_TARGET = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BC_TARGET_DEBUG,
+				BC_TARGET_RELEASE,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+
+	}; /* end objects */
+
+	rootObject = 001;
+}
