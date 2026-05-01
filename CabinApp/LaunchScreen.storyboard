@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB"
-    version="3.0"
-    toolsVersion="21701"
-    targetRuntime="AppleCocoa"
-    propertyAccessControl="none"
-    useAutolayout="YES"
-    launchScreen="YES"
-    useTraitCollections="YES"
-    useSafeAreas="YES"
-    colorMatched="YES"
-    initialViewController="01J-lp-oVM">
+           version="3.0"
+           toolsVersion="21701"
+           targetRuntime="AppleCocoa"
+           propertyAccessControl="none"
+           useAutolayout="YES"
+           launchScreen="YES"
+           useTraitCollections="YES"
+           useSafeAreas="YES"
+           colorMatched="YES">
 
     <device id="retina6_12" orientation="landscape" appearance="dark"/>
 
@@ -21,135 +20,45 @@
     </dependencies>
 
     <scenes>
-        <scene sceneID="EHf-IW-A2E">
+        <scene sceneID="LaunchScene-01">
             <objects>
                 <viewController
-                    id="01J-lp-oVM"
+                    id="LaunchVC-01"
                     sceneMemberID="viewController">
 
                     <view
                         key="view"
                         contentMode="scaleToFill"
-                        id="Ze5-6b-2t3">
+                        id="LaunchView-01">
 
-                        <!-- Pure black background — matches the boarding environment. -->
-                        <rect key="frame" x="0" y="0" width="1366" height="1024"/>
-                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <!-- Pure black background. No logo, no text.
+                             The cabin boarding environment fades in
+                             immediately after launch. -->
+                        <rect key="frame" x="0.0" y="0.0" width="932" height="430"/>
+                        <autoresizingMask key="autoresizingMask"
+                                         widthSizable="YES"
+                                         heightSizable="YES"/>
 
-                        <subviews>
-                            <!-- CABIN wordmark -->
-                            <label
-                                opaque="NO"
-                                clipsSubviews="YES"
-                                userInteractionEnabled="NO"
-                                contentMode="left"
-                                horizontalHuggingPriority="251"
-                                verticalHuggingPriority="251"
-                                text="CABIN"
-                                textAlignment="center"
-                                lineBreakMode="middleTruncation"
-                                baselineAdjustment="alignBaselines"
-                                adjustsFontSizeToFit="NO"
-                                translatesAutoresizingMaskIntoConstraints="NO"
-                                id="GJd-Yh-RWb">
-                                <rect key="frame" x="583" y="452" width="200" height="56"/>
-                                <fontDescription
-                                    key="fontDescription"
-                                    type="system"
-                                    pointSize="36"
-                                    weight="thin"/>
-                                <nil key="textColor"/>
-                                <nil key="highlightedColor"/>
-                                <color key="textColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                            </label>
+                        <color key="backgroundColor"
+                               red="0.0"
+                               green="0.0"
+                               blue="0.0"
+                               alpha="1.0"
+                               colorSpace="custom"
+                               customColorSpace="sRGB"/>
 
-                            <!-- Subtle tagline -->
-                            <label
-                                opaque="NO"
-                                clipsSubviews="YES"
-                                userInteractionEnabled="NO"
-                                contentMode="left"
-                                horizontalHuggingPriority="251"
-                                verticalHuggingPriority="251"
-                                text="GATE TO GATE FOCUS"
-                                textAlignment="center"
-                                lineBreakMode="middleTruncation"
-                                baselineAdjustment="alignBaselines"
-                                adjustsFontSizeToFit="NO"
-                                translatesAutoresizingMaskIntoConstraints="NO"
-                                id="Kq2-mN-pLx">
-                                <rect key="frame" x="533" y="514" width="300" height="22"/>
-                                <fontDescription
-                                    key="fontDescription"
-                                    type="system"
-                                    pointSize="13"
-                                    weight="medium"/>
-                                <color key="textColor" white="1" alpha="0.38" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                            </label>
-                        </subviews>
-
-                        <!-- Black background -->
-                        <color key="backgroundColor" red="0" green="0" blue="0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-
-                        <constraints>
-                            <!-- Wordmark: horizontally centred, vertically slightly above mid -->
-                            <constraint
-                                firstItem="GJd-Yh-RWb"
-                                firstAttribute="centerX"
-                                secondItem="Ze5-6b-2t3"
-                                secondAttribute="centerX"
-                                id="cx1"/>
-                            <constraint
-                                firstItem="GJd-Yh-RWb"
-                                firstAttribute="centerY"
-                                secondItem="Ze5-6b-2t3"
-                                secondAttribute="centerY"
-                                constant="-20"
-                                id="cy1"/>
-                            <constraint
-                                firstItem="GJd-Yh-RWb"
-                                firstAttribute="width"
-                                constant="200"
-                                id="w1"/>
-                            <constraint
-                                firstItem="GJd-Yh-RWb"
-                                firstAttribute="height"
-                                constant="56"
-                                id="h1"/>
-
-                            <!-- Tagline: centred, 16pt below wordmark -->
-                            <constraint
-                                firstItem="Kq2-mN-pLx"
-                                firstAttribute="centerX"
-                                secondItem="Ze5-6b-2t3"
-                                secondAttribute="centerX"
-                                id="cx2"/>
-                            <constraint
-                                firstItem="Kq2-mN-pLx"
-                                firstAttribute="top"
-                                secondItem="GJd-Yh-RWb"
-                                secondAttribute="bottom"
-                                constant="14"
-                                id="cy2"/>
-                            <constraint
-                                firstItem="Kq2-mN-pLx"
-                                firstAttribute="width"
-                                constant="300"
-                                id="w2"/>
-                        </constraints>
-
-                        <viewLayoutGuide key="safeAreaLayoutGuide" id="Bcu-3y-fUS"/>
+                        <viewLayoutGuide key="safeAreaLayoutGuide" id="LaunchSafe-01"/>
                     </view>
                 </viewController>
 
                 <placeholder
                     placeholderIdentifier="IBFirstResponder"
-                    id="iYj-Kq-Ea1"
-                    userLabel="First Responder"
+                    id="LaunchFirstResponder-01"
                     sceneMemberID="firstResponder"/>
             </objects>
 
-            <point key="canvasLocation" x="53" y="375"/>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
         </scene>
     </scenes>
+
 </document>
