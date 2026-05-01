@@ -1,46 +1,40 @@
 // CabinApp.swift
-// @main entry point for the Cabin iPadOS / macOS Catalyst app.
-// Bootstraps the UE5 runtime embedded inside an MTKView,
-// then hands control to ContentView (SwiftUI).
+// @main entry point for the Cabin iPadOS / macOS app.
+// Hosts the UE5 Metal view and the SwiftUI IFE overlay.
 
 import SwiftUI
-import MetalKit
-import CoreMotion
+import AVFoundation
 
 @main
 struct CabinApp: App {
 
-    // Single shared session engine — drives all state across the view tree.
-    @StateObject private var session = SessionEngine()
+    @StateObject private var sessionEngine = SessionEngine()
+    @StateObject private var audioController = AudioController()
 
-    // Audio controller lives at the app level so it survives view transitions.
-    @StateObject private var audio = AudioController()
+    init() {
+        configureAudioSession()
+    }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(session)
-                .environmentObject(audio)
-                // Lock to landscape on iPad.
-                .onAppear {
-                    AppOrientationHelper.lockLandscape()
-                }
+                .environmentObject(sessionEngine)
+                .environmentObject(audioController)
+                // Hide the standard title bar chrome — Cabin is full-bleed.
+                .persistentSystemOverlays(.hidden)
+                .statusBarHidden(true)
         }
-        // Support iPadOS Split View / Stage Manager.
-        .defaultSize(width: 1024, height: 768)
+        .windowResizability(.contentSize)
     }
-}
 
-// MARK: - Orientation helper
-
-enum AppOrientationHelper {
-    static func lockLandscape() {
-#if os(iOS)
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            scene.requestGeometryUpdate(
-                .iOS(interfaceOrientations: .landscape)
-            ) { _ in }
+    private func configureAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            // .playback keeps audio alive when screen locks and in Split View.
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            print("[CabinApp] AVAudioSession setup failed: \(error)")
         }
-#endif
     }
 }
