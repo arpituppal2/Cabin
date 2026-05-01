@@ -10,6 +10,10 @@
 //   - Two-finger swipe up   -> stand-up / break walk
 //   - Pinch inward          -> activate seat recline HUD
 //   - Long press            -> open seat settings overlay
+//
+// Swift 6: GestureRouter is @MainActor-isolated.
+// The Coordinator is also @MainActor — UIKit gesture callbacks are
+// always delivered on the main thread, so this is safe and required.
 
 import SwiftUI
 import UIKit
@@ -25,17 +29,16 @@ enum CabinGestureEvent {
     case seatReclineHUD
 }
 
+@MainActor
 final class GestureRouter: ObservableObject {
 
-    // Subscribers can listen to individual events.
     @Published var lastEvent: CabinGestureEvent? = nil
 
-    // Look sensitivity: full-screen drag ≈ 90°.
     var lookSensitivity: Float = 0.0022
 
-    // Velocity damping for inertial look.
     private var velocity: (yaw: Float, pitch: Float) = (0, 0)
     private let damping: Float = 0.88
+    private var inertiaTask: Task<Void, Never>? = nil
 
     // MARK: - Handlers called by UIKit recognisers
 
@@ -45,6 +48,7 @@ final class GestureRouter: ObservableObject {
             let yaw   =  Float(delta.x) * lookSensitivity
             let pitch = -Float(delta.y) * lookSensitivity
             velocity = (yaw: yaw, pitch: pitch)
+            inertiaTask?.cancel()
             CabinBridge_SendGyro(yaw, pitch)
             lastEvent = .lookDelta(yaw: yaw, pitch: pitch)
         case .ended, .cancelled:
@@ -59,30 +63,27 @@ final class GestureRouter: ObservableObject {
         lastEvent = .tapHotspot(normX: normX, normY: normY)
     }
 
-    func handleTwoFingerSwipeDown() {
-        lastEvent = .trayTableToggle
-    }
-
-    func handleTwoFingerSwipeUp() {
-        lastEvent = .breakWalkTrigger
-    }
-
-    func handleLongPress() {
-        lastEvent = .seatSettingsOpen
-    }
-
-    func handlePinchIn() {
-        lastEvent = .seatReclineHUD
-    }
+    func handleTwoFingerSwipeDown() { lastEvent = .trayTableToggle }
+    func handleTwoFingerSwipeUp()   { lastEvent = .breakWalkTrigger }
+    func handleLongPress()           { lastEvent = .seatSettingsOpen }
+    func handlePinchIn()             { lastEvent = .seatReclineHUD }
 
     // MARK: - Inertia
+    // Uses a Task loop instead of DispatchQueue.main.asyncAfter.
+    // Task inherits @MainActor isolation from the surrounding context,
+    // so velocity mutations remain data-race-free.
 
     private func applyInertia() {
-        guard abs(velocity.yaw) > 0.0001 || abs(velocity.pitch) > 0.0001 else { return }
-        velocity = (yaw: velocity.yaw * damping, pitch: velocity.pitch * damping)
-        CabinBridge_SendGyro(velocity.yaw, velocity.pitch)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) { [weak self] in
-            self?.applyInertia()
+        inertiaTask?.cancel()
+        inertiaTask = Task { @MainActor in
+            while !Task.isCancelled
+                    && (abs(velocity.yaw) > 0.0001 || abs(velocity.pitch) > 0.0001) {
+                velocity = (yaw: velocity.yaw * damping, pitch: velocity.pitch * damping)
+                CabinBridge_SendGyro(velocity.yaw, velocity.pitch)
+                // ~16 ms frame cadence
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+            inertiaTask = nil
         }
     }
 }
@@ -132,7 +133,6 @@ struct GestureRouterView: UIViewRepresentable {
         let pinch = UIPinchGestureRecognizer(target: coord, action: #selector(Coordinator.pinch(_:)))
         view.addGestureRecognizer(pinch)
 
-        // Allow simultaneous recognition between pan + others.
         coord.gestureView = view
         return view
     }
@@ -142,6 +142,8 @@ struct GestureRouterView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(router: router) }
 
     // MARK: Coordinator
+    // Marked @MainActor: UIKit always delivers gesture callbacks on the
+    // main thread, and we immediately forward to the @MainActor router.
 
     @MainActor
     class Coordinator: NSObject, UIGestureRecognizerDelegate {
@@ -164,9 +166,10 @@ struct GestureRouterView: UIViewRepresentable {
         @objc func tap(_ g: UITapGestureRecognizer) {
             guard let view = g.view else { return }
             let loc = g.location(in: view)
-            let normX = Float(loc.x / view.bounds.width)
-            let normY = Float(loc.y / view.bounds.height)
-            router.handleTap(normX: normX, normY: normY)
+            router.handleTap(
+                normX: Float(loc.x / view.bounds.width),
+                normY: Float(loc.y / view.bounds.height)
+            )
         }
 
         @objc func swipeDown(_ g: UISwipeGestureRecognizer) {

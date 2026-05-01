@@ -5,6 +5,12 @@
 //   - air vent hiss loop
 //   - boarding ambience loop
 //   - one-shot chimes / tray table / meal clinks / PA
+//
+// Swift 6: entire class is @MainActor-isolated.
+// AVAudioEngine and AVAudioPlayerNode are called on the main actor;
+// this is safe because we never do heavy DSP here — we only schedule
+// buffers. Actual audio rendering happens on AVAudioEngine's internal
+// real-time thread, which is separate and unaffected by actor isolation.
 
 import Foundation
 import SwiftUI
@@ -13,8 +19,7 @@ import AVFoundation
 @MainActor
 final class AudioController: ObservableObject {
 
-    private let engine = AVAudioEngine()
-
+    private let engine        = AVAudioEngine()
     private let engineHumNode = AVAudioPlayerNode()
     private let ventNode      = AVAudioPlayerNode()
     private let ambienceNode  = AVAudioPlayerNode()
@@ -50,20 +55,20 @@ final class AudioController: ObservableObject {
     func beginBoardingAudio() {
         ensureEngineRunning()
         playLoop(named: "boarding_ambience", on: ambienceNode, volume: 0.22)
-        playLoop(named: "cabin_hum", on: engineHumNode, volume: 0.18)
+        playLoop(named: "cabin_hum",         on: engineHumNode, volume: 0.18)
     }
 
     func beginTaxiAudio() {
         ensureEngineRunning()
         playLoop(named: "engine_spool", on: engineHumNode, volume: 0.38)
-        playLoop(named: "vent_hiss", on: ventNode, volume: 0.12)
+        playLoop(named: "vent_hiss",    on: ventNode,      volume: 0.12)
         playOneShot(named: "seatbelt_ding")
     }
 
     func beginCruiseAudio() {
         ensureEngineRunning()
         playLoop(named: "engine_cruise", on: engineHumNode, volume: 0.30)
-        playLoop(named: "vent_hiss", on: ventNode, volume: 0.14)
+        playLoop(named: "vent_hiss",     on: ventNode,      volume: 0.14)
     }
 
     func beginDescentAudio() {
@@ -74,17 +79,9 @@ final class AudioController: ObservableObject {
 
     // MARK: - UI SFX
 
-    func playIFETap() {
-        playOneShot(named: "ife_tap")
-    }
-
-    func playTrayClunk() {
-        playOneShot(named: "tray_clunk")
-    }
-
-    func playMealService() {
-        playOneShot(named: "meal_clink")
-    }
+    func playIFETap()     { playOneShot(named: "ife_tap") }
+    func playTrayClunk()  { playOneShot(named: "tray_clunk") }
+    func playMealService() { playOneShot(named: "meal_clink") }
 
     // MARK: - Internal helpers
 
@@ -97,6 +94,8 @@ final class AudioController: ObservableObject {
         }
     }
 
+    /// Schedule a looping audio file using a Task-based delay instead of
+    /// DispatchQueue.main, keeping the call-stack inside the @MainActor domain.
     private func playLoop(named name: String, on node: AVAudioPlayerNode, volume: Float) {
         guard let file = loadAudioFile(named: name) else { return }
         if node.isPlaying { node.stop() }
@@ -104,8 +103,12 @@ final class AudioController: ObservableObject {
         node.scheduleFile(file, at: nil, completionHandler: nil)
         node.play()
 
-        // Re-schedule in a simple loop. In production, use completion chaining.
-        DispatchQueue.main.asyncAfter(deadline: .now() + file.duration * 0.95) { [weak self, weak node] in
+        let loopDelay = file.duration * 0.95
+
+        Task { @MainActor [weak self, weak node] in
+            // Sleep off the main thread while still keeping the continuation
+            // on the main actor when it resumes.
+            try? await Task.sleep(for: .seconds(loopDelay))
             guard let self, let node, node.isPlaying else { return }
             self.playLoop(named: name, on: node, volume: volume)
         }
