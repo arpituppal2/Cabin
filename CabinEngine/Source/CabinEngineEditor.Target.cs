@@ -1,8 +1,7 @@
 // CabinEngineEditor.Target.cs
-// Editor target — Mac only for development and content cooking.
+// Editor target — used when opening the project in the Unreal Editor on Mac.
 
 using UnrealBuildTool;
-using System.Collections.Generic;
 
 public class CabinEngineEditorTarget : TargetRules
 {
@@ -11,6 +10,11 @@ public class CabinEngineEditorTarget : TargetRules
         Type = TargetType.Editor;
         DefaultBuildSettings = BuildSettingsVersion.V4;
         IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_3;
+
         ExtraModuleNames.Add("CabinEngine");
+
+        // Enable live coding for rapid Blueprint/C++ iteration in the editor.
+        bUseUnityBuild = true;
+        bAdaptiveUnityBuild = true;
     }
 }
