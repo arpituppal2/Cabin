@@ -1,0 +1,79 @@
+{
+  "_comment": "Blueprint stub for BP_CabinSessionManager. Orchestrates phase transitions in the Blueprints layer, calling C++ through the exposed UFUNCTIONs.",
+  "BlueprintClass": "BP_CabinSessionManager",
+  "ParentClass": "CabinSessionManager",
+  "Description": "Thin Blueprint layer on top of ACabinSessionManager C++. Drives visual/audio phase transitions by calling into BP_WindowSystem, BP_CabinConsole, and the Sequencer assets.",
+
+  "EventGraph": [
+    {
+      "Node": "Custom Event: OnBoardingPhase",
+      "Connections": [
+        "-> Set cabin lights bright white (LightingScenario_Boarding)",
+        "-> BP_WindowSystem.SetTimeOfDay(Day)",
+        "-> Play Sound: SFX_BoardingAmbience (loop)",
+        "-> Play Sequencer: SEQ_JetBridgeVisible"
+      ]
+    },
+    {
+      "Node": "Custom Event: OnTaxiPhase",
+      "Connections": [
+        "-> Fade cabin lights to blue-purple (LightingScenario_Taxi)",
+        "-> Play Sound: SFX_EngineSpool (loop)",
+        "-> Play Sequencer: SEQ_TaxiRoll",
+        "-> Play Sound: SFX_SeatbeltDing"
+      ]
+    },
+    {
+      "Node": "Custom Event: OnTakeoffPhase",
+      "Connections": [
+        "-> Play Sequencer: SEQ_TakeoffRoll",
+        "-> Timeline: tilt camera to +14deg over 8s",
+        "-> Increase engine sound volume to 0.85",
+        "-> Trigger slight camera shake: CS_TakeoffShake"
+      ]
+    },
+    {
+      "Node": "Custom Event: OnCruisePhase",
+      "Connections": [
+        "-> Timeline: return camera to 0deg over 6s",
+        "-> Play Sound: SFX_EngineCruise (loop, replace spool)",
+        "-> Play Sound: SFX_VentHiss (loop)",
+        "-> Play Sound: SFX_SeatbeltDing (off)",
+        "-> BP_WindowSystem.SetTimeOfDay based on real time of day",
+        "-> Begin turbulence timeline on BP_CabinPawn"
+      ]
+    },
+    {
+      "Node": "Custom Event: OnBreakPhase",
+      "Connections": [
+        "-> Play Sequencer: SEQ_BreakWalk (aisle walk)",
+        "-> OR fade in tea/meal on tray table (MI_MealService)",
+        "-> Play Sound: SFX_GalleyAmbience"
+      ]
+    },
+    {
+      "Node": "Custom Event: OnDescentPhase",
+      "Connections": [
+        "-> Play Sound: SFX_PA_PrepareArrival",
+        "-> Timeline: tilt camera to -4deg over 12s",
+        "-> Fade cabin lights back to bright white",
+        "-> Play Sound: SFX_GearThud (after 45s delay)"
+      ]
+    },
+    {
+      "Node": "Custom Event: OnLandingPhase",
+      "Connections": [
+        "-> Play Sequencer: SEQ_TouchdownRoll",
+        "-> Camera shake: CS_LandingShake",
+        "-> Fade engine sound to silence over 30s"
+      ]
+    },
+    {
+      "Node": "Custom Event: OnGateArrivalPhase",
+      "Connections": [
+        "-> Fade in 'Session Complete' overlay (WBP_SessionSummary)",
+        "-> Show stats: sprints completed, total focus time, route flown"
+      ]
+    }
+  ]
+}

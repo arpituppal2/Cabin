@@ -1,0 +1,103 @@
+{
+  "_comment": "Blueprint stub for BP_CabinPawn. Inherits ACabinPawn. Wire camera, turbulence, and seat anim nodes here.",
+  "BlueprintClass": "BP_CabinPawn",
+  "ParentClass": "CabinPawn",
+  "Description": "First-person pawn. Owns the camera spring arm, turbulence timeline, and seat-recline timeline.",
+
+  "Components": [
+    {
+      "Name": "CabinRoot",
+      "Type": "SceneComponent",
+      "IsRoot": true
+    },
+    {
+      "Name": "SpringArm",
+      "Type": "USpringArmComponent",
+      "Parent": "CabinRoot",
+      "Properties": {
+        "TargetArmLength": 0,
+        "bUsePawnControlRotation": true,
+        "bDoCollisionTest": false,
+        "bEnableCameraLag": true,
+        "CameraLagSpeed": 8.0,
+        "CameraLagMaxDistance": 12.0
+      }
+    },
+    {
+      "Name": "CabinCamera",
+      "Type": "UCameraComponent",
+      "Parent": "SpringArm",
+      "Properties": {
+        "FieldOfView": 72.0,
+        "bUsePawnControlRotation": false,
+        "PostProcessBlendWeight": 1.0,
+        "PostProcessSettings": {
+          "bOverride_DepthOfFieldFocalDistance": true,
+          "DepthOfFieldFocalDistance": 65.0,
+          "bOverride_DepthOfFieldFstop": true,
+          "DepthOfFieldFstop": 2.4,
+          "bOverride_FilmGrainIntensity": true,
+          "FilmGrainIntensity": 0.04
+        }
+      }
+    },
+    {
+      "Name": "IFEScreenMesh",
+      "Type": "UStaticMeshComponent",
+      "Parent": "CabinRoot",
+      "Properties": {
+        "StaticMesh": "SM_IFEScreen",
+        "RelativeLocation": { "X": 65, "Y": 0, "Z": 2.5 },
+        "Materials": ["M_IFEDynamic"]
+      }
+    }
+  ],
+
+  "Variables": [
+    { "Name": "TurbulenceTimeline",  "Type": "FTimeline" },
+    { "Name": "SeatReclineTimeline", "Type": "FTimeline" },
+    { "Name": "bTrayDeployed",       "Type": "bool", "Default": false },
+    { "Name": "CurrentSeatIndex",    "Type": "int32", "Default": 7 },
+    { "Name": "LookYawAccum",        "Type": "float", "Default": 0.0 },
+    { "Name": "LookPitchAccum",      "Type": "float", "Default": 0.0 }
+  ],
+
+  "EventGraph": [
+    {
+      "Node": "Event BeginPlay",
+      "Connections": [
+        "-> Add Turbulence Timeline (looping float curve: CRV_Turbulence)",
+        "-> Bind CabinLookYaw axis -> Add Controller Yaw Input",
+        "-> Bind CabinLookPitch axis -> Add Controller Pitch Input",
+        "-> Bind CabinTap action -> OnTapHotspot()",
+        "-> Bind CabinTrayToggle action -> ToggleTrayTable()",
+        "-> Bind CabinBreakWalk action -> BeginBreakWalk()",
+        "-> Bind CabinIFECycle action -> CycleIFEMode()"
+      ]
+    },
+    {
+      "Node": "TurbulenceTimeline Update",
+      "Inputs": ["Alpha (float)"],
+      "Connections": [
+        "-> Multiply Alpha by TurbulenceYawMag -> Add Controller Yaw Input",
+        "-> Multiply Alpha by TurbulencePitchMag -> Add Controller Pitch Input"
+      ]
+    },
+    {
+      "Node": "Custom Event: ToggleTrayTable",
+      "Connections": [
+        "-> FlipFlop",
+        "  A (deploy):  -> Play Anim: AM_TrayDeploy -> Play Sound: SFX_TrayClunk",
+        "  B (stow):    -> Play Anim: AM_TrayStow   -> Play Sound: SFX_TrayClunk",
+        "-> Set bTrayDeployed"
+      ]
+    },
+    {
+      "Node": "Custom Event: BeginBreakWalk",
+      "Connections": [
+        "-> Play Sequence: SEQ_BreakWalk (Sequencer asset)",
+        "-> Play Sound: SFX_CabinFootsteps"
+      ]
+    }
+  ]
+}

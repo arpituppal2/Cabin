@@ -1,0 +1,83 @@
+{
+  "_comment": "Blueprint stub for BP_WindowSystem. Manages the hybrid procedural+video-plate window view.",
+  "BlueprintClass": "BP_WindowSystem",
+  "ParentClass": "Actor",
+  "Description": "Owns the window mesh, media player, procedural sky material, and time-of-day lighting rig. Blends between video plates and procedural clouds based on phase and time of day.",
+
+  "Components": [
+    {
+      "Name": "WindowMeshLeft",
+      "Type": "UStaticMeshComponent",
+      "Properties": { "StaticMesh": "SM_WindowFrame", "Materials": ["MI_WindowLeft"] }
+    },
+    {
+      "Name": "WindowMeshRight",
+      "Type": "UStaticMeshComponent",
+      "Properties": { "StaticMesh": "SM_WindowFrame", "Materials": ["MI_WindowRight"] }
+    },
+    {
+      "Name": "MediaPlayerLeft",
+      "Type": "UMediaPlayer",
+      "Properties": { "bLooping": true, "bAutoPlay": false }
+    },
+    {
+      "Name": "MediaPlayerRight",
+      "Type": "UMediaPlayer",
+      "Properties": { "bLooping": true, "bAutoPlay": false }
+    },
+    {
+      "Name": "DirectionalLight_Sun",
+      "Type": "UDirectionalLightComponent",
+      "Properties": { "bCastShadows": true, "Intensity": 10.0, "LightColor": "(R=1.0,G=0.95,B=0.88)" }
+    },
+    {
+      "Name": "SkyAtmosphere",
+      "Type": "USkyAtmosphereComponent"
+    },
+    {
+      "Name": "VolumetricCloud",
+      "Type": "UVolumetricCloudComponent",
+      "Properties": { "LayerBottomAltitude": 8.0, "LayerHeight": 12.0 }
+    }
+  ],
+
+  "Variables": [
+    { "Name": "CurrentTimeOfDay",    "Type": "ETimeOfDay (Enum: Dawn, Day, Sunset, Night)" },
+    { "Name": "CurrentSeatSide",     "Type": "ESeatSide (Enum: Left, Right, Center)" },
+    { "Name": "bUseVideoPlate",      "Type": "bool", "Default": true },
+    { "Name": "ProceduralBlendAlpha","Type": "float", "Default": 0.0 },
+    { "Name": "SunElevationAngle",   "Type": "float", "Default": 45.0 }
+  ],
+
+  "Functions": [
+    {
+      "Name": "SetTimeOfDay",
+      "Inputs": ["NewTime (ETimeOfDay)"],
+      "Logic": [
+        "Set CurrentTimeOfDay",
+        "-> Switch on ETimeOfDay -> Set SunElevationAngle (Dawn:8, Day:55, Sunset:4, Night:-20)",
+        "-> Set Directional Light Rotation from SunElevationAngle",
+        "-> Update sky atmosphere rayleigh / mie params per time",
+        "-> LoadAndPlayVideoPlate(CurrentSeatSide, NewTime)"
+      ]
+    },
+    {
+      "Name": "LoadAndPlayVideoPlate",
+      "Inputs": ["Side (ESeatSide)", "Time (ETimeOfDay)"],
+      "Logic": [
+        "Construct asset path from DefaultGame.ini CabinWindowPlates table",
+        "-> Open Media Source on MediaPlayerLeft or MediaPlayerRight",
+        "-> Play",
+        "-> Set MI_Window texture parameter to MediaTexture"
+      ]
+    },
+    {
+      "Name": "BlendToProceduralClouds",
+      "Inputs": ["Alpha (float, 0=video, 1=procedural)"],
+      "Logic": [
+        "Set MI_Window scalar BlendAlpha = Alpha",
+        "Lerp VolumetricCloud density between 0 and full"
+      ]
+    }
+  ]
+}

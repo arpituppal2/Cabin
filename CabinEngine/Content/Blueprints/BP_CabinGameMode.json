@@ -1,0 +1,38 @@
+{
+  "_comment": "Blueprint stub descriptor for BP_CabinGameMode. Open CabinEngine in UE5, create a Blueprint class inheriting ACabinGameMode, and wire the graphs described here.",
+  "BlueprintClass": "BP_CabinGameMode",
+  "ParentClass": "CabinGameMode",
+  "Description": "Sets default pawn, player controller, and HUD. Registers phase-change delegates.",
+
+  "DefaultProperties": {
+    "DefaultPawnClass": "BP_CabinPawn",
+    "PlayerControllerClass": "CabinPlayerController",
+    "HUDClass": "None"
+  },
+
+  "EventGraph": [
+    {
+      "Node": "Event BeginPlay",
+      "Connections": [
+        "-> Set Show Mouse Cursor (false)",
+        "-> Get Player Controller -> Set Input Mode: Game Only",
+        "-> Print String: 'CabinGameMode ready'"
+      ]
+    },
+    {
+      "Node": "Event OnPhaseChanged (Custom Event, called from C++ delegate)",
+      "Inputs": ["NewPhase (ECabinPhase)"],
+      "Connections": [
+        "-> Switch on ECabinPhase",
+        "  Boarding:    -> BP_CabinSessionManager.OnBoardingPhase()",
+        "  Taxi:        -> BP_CabinSessionManager.OnTaxiPhase()",
+        "  Takeoff:     -> BP_CabinSessionManager.OnTakeoffPhase()",
+        "  Cruise:      -> BP_CabinSessionManager.OnCruisePhase()",
+        "  CabinBreak:  -> BP_CabinSessionManager.OnBreakPhase()",
+        "  Descent:     -> BP_CabinSessionManager.OnDescentPhase()",
+        "  Landing:     -> BP_CabinSessionManager.OnLandingPhase()",
+        "  GateArrival: -> BP_CabinSessionManager.OnGateArrivalPhase()"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "_comment": "Blueprint stub for BP_CabinConsole. Handles the physical side console UI: seat position buttons, amenity kit, storage cubby.",
+  "BlueprintClass": "BP_CabinConsole",
+  "ParentClass": "Actor",
+  "Description": "The faux-marble side console. Owns capacitive button meshes with emissive press feedback and the storage cubby with sliding door anim.",
+
+  "Components": [
+    { "Name": "ConsoleMesh",    "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_Console", "Materials": ["MI_FauxMarble"] } },
+    { "Name": "ButtonUpright",  "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_ConsoleButton", "Materials": ["MI_ButtonIdle"] } },
+    { "Name": "ButtonLounge",   "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_ConsoleButton", "Materials": ["MI_ButtonIdle"] } },
+    { "Name": "ButtonBed",      "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_ConsoleButton", "Materials": ["MI_ButtonIdle"] } },
+    { "Name": "ButtonLumbar",   "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_ConsoleButton", "Materials": ["MI_ButtonIdle"] } },
+    { "Name": "StorageCubby",   "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_StorageCubby" } },
+    { "Name": "CubbyDoor",      "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_CubbyDoor" } },
+    { "Name": "CubbyLight",     "Type": "UPointLightComponent", "Properties": { "Intensity": 80, "LightColor": "(R=1,G=0.96,B=0.88)", "AttenuationRadius": 25 } },
+    { "Name": "EvianBottle",    "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_EvianBottle" } },
+    { "Name": "Headphones",     "Type": "UStaticMeshComponent", "Properties": { "StaticMesh": "SM_NoiseCancelHeadphones" } }
+  ],
+
+  "EventGraph": [
+    {
+      "Node": "Custom Event: OnSeatButtonTapped (called from CabinPlayerController hotspot resolver)",
+      "Inputs": ["ButtonType (ESeatPosition: Upright, Lounge, Bed, Lumbar)"],
+      "Connections": [
+        "-> Set Button emissive to 'pressed' MI_ButtonPressed",
+        "-> Delay 0.18s -> Reset to MI_ButtonIdle",
+        "-> Play Sound: SFX_ButtonClick",
+        "-> Notify BP_CabinPawn.SetSeatPosition(ButtonType)"
+      ]
+    },
+    {
+      "Node": "Custom Event: ToggleCubby",
+      "Connections": [
+        "-> FlipFlop",
+        "  A (open):  -> Play Anim: AM_CubbyOpen  -> Set CubbyLight visible",
+        "  B (close): -> Play Anim: AM_CubbyClose -> Hide CubbyLight"
+      ]
+    }
+  ]
+}
