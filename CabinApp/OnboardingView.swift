@@ -1,446 +1,458 @@
 // OnboardingView.swift
-// The gate experience — seat selection + session configuration.
-// Full-screen, immersive. No floating modals.
-// Steps:
-//   1. Seat selection (1-2-1 cabin diagram)
-//   2. Route selection (IATA + globe preview)
-//   3. Session timing (duration + sprint length)
+// The gate-to-gate onboarding experience.
+// Presented before every session. Allows the user to:
+//   1. Select a seat from the 1-2-1 cabin diagram.
+//   2. Choose a route (departure + arrival airport).
+//   3. Set total session time, sprint duration, break duration.
+//   4. Tap "Begin Flight" to launch the cabin.
 
 import SwiftUI
 
-struct OnboardingView: View {
-    let onComplete: (CabinSessionConfig) -> Void
+// MARK: - Seat model
 
-    @State private var step:          Int = 0
-    @State private var config:        CabinSessionConfig = CabinSessionConfig()
-    @State private var stepOpacity:   Double = 1.0
+struct CabinSeat: Identifiable {
+    let id: Int            // 0–7, matches C bridge seatIndex
+    let code: String       // "1A", "2B", etc.
+    let column: String     // "A", "B", "D", "G", "J", "L"
+    let row: Int           // 1 or 2 (stagger)
+    let side: SeatSide
+    let description: String
+
+    enum SeatSide { case leftWindow, leftAisle, centerLeft, centerRight, rightAisle, rightWindow }
+}
+
+let allSeats: [CabinSeat] = [
+    CabinSeat(id: 0, code: "1A", column: "A", row: 1, side: .leftWindow,
+              description: "True Left Window \u2014 Maximum privacy, flush to the hull."),
+    CabinSeat(id: 1, code: "2B", column: "B", row: 2, side: .leftAisle,
+              description: "Left Aisle \u2014 Console by window, open to the cabin."),
+    CabinSeat(id: 2, code: "1D", column: "D", row: 1, side: .centerLeft,
+              description: "Center Left, Aisle Facing \u2014 Console in the centre."),
+    CabinSeat(id: 3, code: "2D", column: "D", row: 2, side: .centerLeft,
+              description: "\u201cHoneymoon\u201d \u2014 Tucked in the middle, console shields the aisle."),
+    CabinSeat(id: 4, code: "2G", column: "G", row: 2, side: .centerRight,
+              description: "\u201cHoneymoon\u201d \u2014 Mirror pair of 2D."),
+    CabinSeat(id: 5, code: "1G", column: "G", row: 1, side: .centerRight,
+              description: "Center Right, Aisle Facing \u2014 Console in the centre."),
+    CabinSeat(id: 6, code: "2J", column: "J", row: 2, side: .rightAisle,
+              description: "Right Aisle \u2014 Console on window side."),
+    CabinSeat(id: 7, code: "1L", column: "L", row: 1, side: .rightWindow,
+              description: "True Right Window \u2014 Maximum privacy, flush to the hull."),
+]
+
+// MARK: - Route presets
+
+struct RoutePreset: Identifiable, Hashable {
+    let id = UUID()
+    let dep: String; let arr: String
+    let depName: String; let arrName: String
+    let depLon: Float; let depLat: Float
+    let arrLon: Float; let arrLat: Float
+    let durationHours: Float
+    var label: String { "\(dep) \u2192 \(arr)" }
+}
+
+let routePresets: [RoutePreset] = [
+    RoutePreset(dep: "LAX", arr: "LHR", depName: "Los Angeles", arrName: "London Heathrow",
+                depLon: -118.4085, depLat: 33.9425, arrLon: -0.4543, arrLat: 51.4775,
+                durationHours: 10.5),
+    RoutePreset(dep: "JFK", arr: "NRT", depName: "New York JFK", arrName: "Tokyo Narita",
+                depLon: -73.7789, depLat: 40.6413, arrLon: 140.3864, arrLat: 35.7647,
+                durationHours: 14.0),
+    RoutePreset(dep: "SFO", arr: "SIN", depName: "San Francisco", arrName: "Singapore Changi",
+                depLon: -122.3789, depLat: 37.6213, arrLon: 103.9915, arrLat: 1.3644,
+                durationHours: 17.0),
+    RoutePreset(dep: "CDG", arr: "GRU", depName: "Paris CDG", arrName: "S\u00e3o Paulo GRU",
+                depLon: 2.5479, depLat: 49.0097, arrLon: -46.4731, arrLat: -23.4356,
+                durationHours: 11.5),
+    RoutePreset(dep: "DXB", arr: "SYD", depName: "Dubai", arrName: "Sydney",
+                depLon: 55.3644, depLat: 25.2532, arrLon: 151.1772, arrLat: -33.9461,
+                durationHours: 13.5),
+    RoutePreset(dep: "ORD", arr: "FRA", depName: "Chicago O'Hare", arrName: "Frankfurt",
+                depLon: -87.9073, depLat: 41.9742, arrLon: 8.5706,  arrLat: 50.0379,
+                durationHours: 9.0),
+]
+
+// MARK: - OnboardingView
+
+struct OnboardingView: View {
+
+    let onComplete: (SessionConfig) -> Void
+
+    @State private var selectedSeatID: Int = 7  // Default: 1L right window
+    @State private var selectedRoute: RoutePreset = routePresets[0]
+    @State private var sessionMinutes: Double = 90
+    @State private var sprintMinutes: Double = 25
+    @State private var breakMinutes: Double = 5
+    @State private var taxiMinutes: Double = 5
+    @State private var step: OnboardingStep = .seatSelection
 
     var body: some View {
         ZStack {
-            // Gate ambiance background.
-            LinearGradient(
-                colors: [
-                    Color(red: 0.08, green: 0.09, blue: 0.12),
-                    Color(red: 0.12, green: 0.14, blue: 0.18)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            Color.black.ignoresSafeArea()
 
-            // Subtle noise overlay.
-            Canvas { ctx, size in
-                for i in 0..<3000 {
-                    let x = CGFloat((i * 7919) % Int(size.width))
-                    let y = CGFloat((i * 6271) % Int(size.height))
-                    ctx.fill(
-                        Path(CGRect(x: x, y: y, width: 1, height: 1)),
-                        with: .color(.white.opacity(0.018))
-                    )
-                }
-            }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 48) {
+                    header
 
-            VStack(spacing: 0) {
-                // Airline wordmark
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("CABIN")
-                            .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                            .tracking(6)
-                            .foregroundStyle(.white.opacity(0.9))
-                        Text("DEEP WORK IN FLIGHT")
-                            .font(.system(size: 10, weight: .regular, design: .monospaced))
-                            .tracking(3)
-                            .foregroundStyle(.white.opacity(0.3))
-                    }
-                    Spacer()
-                    // Gate display.
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("GATE B22")
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                            .tracking(2)
-                            .foregroundStyle(.white.opacity(0.5))
-                        Text("BOARDING NOW")
-                            .font(.system(size: 10, weight: .regular, design: .monospaced))
-                            .tracking(2)
-                            .foregroundStyle(Color(red: 1, green: 0.55, blue: 0.1).opacity(0.85))
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.top, 32)
-
-                // Boarding pass divider.
-                HStack {
-                    Rectangle().fill(.white.opacity(0.06)).frame(height: 1)
-                    Text("✂️")
-                        .font(.system(size: 14))
-                        .rotationEffect(.degrees(-90))
-                    Rectangle().fill(.white.opacity(0.06)).frame(height: 1)
-                }
-                .padding(.horizontal, 40)
-                .padding(.vertical, 16)
-
-                // Step content.
-                Group {
                     switch step {
-                    case 0: SeatSelectionStep(config: $config)
-                    case 1: RouteSelectionStep(config: $config)
-                    case 2: TimingStep(config: $config)
-                    default: EmptyView()
+                    case .seatSelection:
+                        seatSelectionSection
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal:   .move(edge: .leading).combined(with: .opacity)
+                            ))
+                    case .routeConfig:
+                        routeSection
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal:   .move(edge: .leading).combined(with: .opacity)
+                            ))
+                    case .sessionConfig:
+                        sessionConfigSection
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal:   .move(edge: .leading).combined(with: .opacity)
+                            ))
                     }
+
+                    stepButtons
+                        .padding(.bottom, 60)
                 }
-                .opacity(stepOpacity)
-                .animation(.easeInOut(duration: 0.3), value: stepOpacity)
-
-                Spacer()
-
-                // Navigation.
-                HStack(spacing: 16) {
-                    if step > 0 {
-                        Button(action: previousStep) {
-                            Text("BACK")
-                                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                                .tracking(3)
-                                .foregroundStyle(.white.opacity(0.4))
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 14)
-                                .background(.white.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
-                    Spacer()
-                    // Step dots.
-                    HStack(spacing: 6) {
-                        ForEach(0..<3, id: \.self) { i in
-                            Circle()
-                                .fill(i == step ? Color(red: 1, green: 0.55, blue: 0.1) : .white.opacity(0.2))
-                                .frame(width: 6, height: 6)
-                                .animation(.easeInOut(duration: 0.2), value: step)
-                        }
-                    }
-                    Spacer()
-                    Button(action: nextStep) {
-                        Text(step == 2 ? "BOARD" : "CONTINUE")
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                            .tracking(3)
-                            .foregroundStyle(.black)
-                            .padding(.horizontal, 28)
-                            .padding(.vertical, 14)
-                            .background(Color(red: 1, green: 0.55, blue: 0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-                .padding(.horizontal, 40)
-                .padding(.bottom, 36)
+                .padding(.horizontal, 36)
+                .padding(.top, 56)
             }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    // MARK: - Header
+
+    private var header: some View {
+        VStack(spacing: 12) {
+            Text("CABIN")
+                .font(.system(size: 38, weight: .thin, design: .rounded))
+                .tracking(12)
+                .foregroundStyle(.white)
+            Text(step.subtitle.uppercased())
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .tracking(3.6)
+                .foregroundStyle(.white.opacity(0.46))
+                .animation(.easeInOut, value: step)
         }
     }
 
-    private func nextStep() {
-        if step < 2 {
-            withAnimation { stepOpacity = 0 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                step += 1
-                withAnimation { stepOpacity = 1 }
-            }
-        } else {
-            onComplete(config)
-        }
-    }
+    // MARK: - Step 1: Seat Selection
 
-    private func previousStep() {
-        withAnimation { stepOpacity = 0 }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            step -= 1
-            withAnimation { stepOpacity = 1 }
-        }
-    }
-}
+    private var seatSelectionSection: some View {
+        VStack(spacing: 32) {
+            CabinDiagramView(selectedSeatID: $selectedSeatID)
+                .frame(height: 220)
 
-// MARK: - Step 1: Seat Selection
-
-struct SeatSelectionStep: View {
-    @Binding var config: CabinSessionConfig
-
-    // 8 seats: 1A, 2B, 1D, 2D, 2G, 1G, 2J, 1L
-    private let seats = [
-        SeatInfo(index: 0, row: "1", col: "A", side: .left,   type: .window, label: "TRUE WINDOW",  sub: "Maximum privacy"),
-        SeatInfo(index: 1, row: "2", col: "B", side: .left,   type: .aisle,  label: "LEFT AISLE",   sub: "More open feel"),
-        SeatInfo(index: 2, row: "1", col: "D", side: .center, type: .aisle,  label: "CTR LEFT • AISLE", sub: "Console in center"),
-        SeatInfo(index: 3, row: "2", col: "D", side: .center, type: .honey,  label: "HONEYMOON",    sub: "Tucked in middle"),
-        SeatInfo(index: 4, row: "2", col: "G", side: .center, type: .honey,  label: "HONEYMOON",    sub: "Other half"),
-        SeatInfo(index: 5, row: "1", col: "G", side: .center, type: .aisle,  label: "CTR RIGHT • AISLE", sub: "Console in center"),
-        SeatInfo(index: 6, row: "2", col: "J", side: .right,  type: .aisle,  label: "RIGHT AISLE",  sub: "Console on window"),
-        SeatInfo(index: 7, row: "1", col: "L", side: .right,  type: .window, label: "TRUE WINDOW",  sub: "Maximum privacy")
-    ]
-
-    var body: some View {
-        VStack(spacing: 28) {
-            Text("SELECT YOUR SEAT")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .tracking(5)
-                .foregroundStyle(.white.opacity(0.4))
-
-            // Cabin diagram.
-            CabinDiagram(seats: seats, selectedIndex: config.seatIndex) { idx in
-                config.seatIndex = idx
-            }
-            .frame(height: 300)
-
-            // Selected seat description.
-            if let selected = seats.first(where: { $0.index == config.seatIndex }) {
-                VStack(spacing: 6) {
-                    Text("\(selected.row)\(selected.col) — \(selected.label)")
-                        .font(.system(size: 15, weight: .medium, design: .monospaced))
+            if let seat = allSeats.first(where: { $0.id == selectedSeatID }) {
+                VStack(spacing: 8) {
+                    Text("SEAT \(seat.code)")
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .tracking(3)
                         .foregroundStyle(.white)
-                    Text(selected.sub)
-                        .font(.system(size: 12, weight: .regular, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.4))
+                    Text(seat.description)
+                        .font(.system(size: 15, weight: .regular, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.58))
+                        .multilineTextAlignment(.center)
                 }
-                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.22), value: selectedSeatID)
             }
         }
-        .padding(.horizontal, 40)
+    }
+
+    // MARK: - Step 2: Route
+
+    private var routeSection: some View {
+        VStack(spacing: 20) {
+            ForEach(routePresets) { preset in
+                RouteCard(preset: preset, isSelected: selectedRoute.id == preset.id) {
+                    withAnimation(.easeInOut(duration: 0.18)) { selectedRoute = preset }
+                }
+            }
+        }
+    }
+
+    // MARK: - Step 3: Session Config
+
+    private var sessionConfigSection: some View {
+        VStack(spacing: 28) {
+            sliderRow(
+                label: "Session Length",
+                value: $sessionMinutes,
+                range: 30...360,
+                unit: "min",
+                step: 5
+            )
+            sliderRow(
+                label: "Focus Sprint",
+                value: $sprintMinutes,
+                range: 10...60,
+                unit: "min",
+                step: 5
+            )
+            sliderRow(
+                label: "Break Duration",
+                value: $breakMinutes,
+                range: 3...20,
+                unit: "min",
+                step: 1
+            )
+            sliderRow(
+                label: "Boarding / Email Taxi",
+                value: $taxiMinutes,
+                range: 2...20,
+                unit: "min",
+                step: 1
+            )
+        }
+    }
+
+    private func sliderRow(label: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, step: Double) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(label.uppercased())
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .tracking(2.4)
+                    .foregroundStyle(.white.opacity(0.5))
+                Spacer()
+                Text("\(Int(value.wrappedValue)) \(unit)")
+                    .font(.system(size: 20, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
+            Slider(value: value, in: range, step: step)
+                .tint(.white.opacity(0.85))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Navigation Buttons
+
+    private var stepButtons: some View {
+        HStack(spacing: 16) {
+            if step != .seatSelection {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.32)) { step = step.previous }
+                } label: {
+                    Text("BACK")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .tracking(2.4)
+                        .foregroundStyle(.white.opacity(0.7))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+            }
+
+            Button {
+                if step == .sessionConfig {
+                    onComplete(buildConfig())
+                } else {
+                    withAnimation(.easeInOut(duration: 0.32)) { step = step.next }
+                }
+            } label: {
+                Text(step == .sessionConfig ? "BEGIN FLIGHT" : "CONTINUE")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .tracking(2.4)
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 18)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+        }
+    }
+
+    // MARK: - Config builder
+
+    private func buildConfig() -> SessionConfig {
+        var cfg = SessionConfig()
+        cfg.totalMinutes   = Float(sessionMinutes)
+        cfg.sprintMinutes  = Float(sprintMinutes)
+        cfg.breakMinutes   = Float(breakMinutes)
+        cfg.taxiMinutes    = Float(taxiMinutes)
+        cfg.departureIATA  = selectedRoute.dep
+        cfg.arrivalIATA    = selectedRoute.arr
+        cfg.depLon         = selectedRoute.depLon
+        cfg.depLat         = selectedRoute.depLat
+        cfg.arrLon         = selectedRoute.arrLon
+        cfg.arrLat         = selectedRoute.arrLat
+        cfg.seatIndex      = Int32(selectedSeatID)
+        return cfg
     }
 }
 
-struct SeatInfo {
-    enum Side   { case left, center, right }
-    enum SeatType { case window, aisle, honey }
-    let index: Int
-    let row:   String
-    let col:   String
-    let side:  Side
-    let type:  SeatType
-    let label: String
-    let sub:   String
-}
+// MARK: - Cabin Diagram Canvas
 
-struct CabinDiagram: View {
-    let seats:         [SeatInfo]
-    let selectedIndex: Int
-    let onSelect:      (Int) -> Void
+struct CabinDiagramView: View {
+    @Binding var selectedSeatID: Int
 
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let seatW: CGFloat = 72
-            let seatH: CGFloat = 88
-
-            ZStack {
-                // Fuselage outline.
-                Capsule()
-                    .stroke(.white.opacity(0.08), lineWidth: 1.5)
-                    .padding(.horizontal, 20)
-
-                // Aisle lines.
-                Rectangle()
-                    .fill(.white.opacity(0.04))
-                    .frame(width: 2, height: h * 0.7)
-                    .position(x: w * 0.30, y: h * 0.5)
-                Rectangle()
-                    .fill(.white.opacity(0.04))
-                    .frame(width: 2, height: h * 0.7)
-                    .position(x: w * 0.70, y: h * 0.5)
-
-                // 1-2-1 layout positions.
-                // Left window (1A): x=0.12
-                seatView(for: seats[0], at: CGPoint(x: w*0.12, y: h*0.38), seatW: seatW, seatH: seatH)
-                // Left aisle (2B): x=0.24
-                seatView(for: seats[1], at: CGPoint(x: w*0.24, y: h*0.62), seatW: seatW, seatH: seatH)
-                // Center left aisle (1D): x=0.40
-                seatView(for: seats[2], at: CGPoint(x: w*0.40, y: h*0.38), seatW: seatW, seatH: seatH)
-                // Center left honeymoon (2D): x=0.40
-                seatView(for: seats[3], at: CGPoint(x: w*0.40, y: h*0.62), seatW: seatW, seatH: seatH)
-                // Center right honeymoon (2G): x=0.60
-                seatView(for: seats[4], at: CGPoint(x: w*0.60, y: h*0.62), seatW: seatW, seatH: seatH)
-                // Center right aisle (1G): x=0.60
-                seatView(for: seats[5], at: CGPoint(x: w*0.60, y: h*0.38), seatW: seatW, seatH: seatH)
-                // Right aisle (2J): x=0.76
-                seatView(for: seats[6], at: CGPoint(x: w*0.76, y: h*0.62), seatW: seatW, seatH: seatH)
-                // Right window (1L): x=0.88
-                seatView(for: seats[7], at: CGPoint(x: w*0.88, y: h*0.38), seatW: seatW, seatH: seatH)
+            Canvas { context, size in
+                drawCabin(context: context, size: size)
+            } symbols: {
+                // Invisible symbols block; seat labels drawn directly in Canvas.
             }
-        }
-    }
-
-    @ViewBuilder
-    private func seatView(for seat: SeatInfo, at pos: CGPoint, seatW: CGFloat, seatH: CGFloat) -> some View {
-        let isSelected = seat.index == selectedIndex
-        Button(action: { onSelect(seat.index) }) {
-            VStack(spacing: 4) {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isSelected
-                        ? Color(red: 1, green: 0.55, blue: 0.1)
-                        : Color.white.opacity(0.08))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(isSelected ? .clear : .white.opacity(0.15), lineWidth: 1)
-                    )
-                    .frame(width: seatW - 8, height: seatH - 24)
-                Text("\(seat.row)\(seat.col)")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(isSelected ? Color(red: 1, green: 0.55, blue: 0.1) : .white.opacity(0.4))
-            }
-        }
-        .frame(width: seatW, height: seatH)
-        .position(pos)
-        .animation(.easeInOut(duration: 0.15), value: isSelected)
-    }
-}
-
-// MARK: - Step 2: Route Selection
-
-struct RouteSelectionStep: View {
-    @Binding var config: CabinSessionConfig
-
-    private let presets: [(dep: String, arr: String, name: String)] = [
-        ("LAX", "LHR", "Los Angeles → London"),
-        ("JFK", "CDG", "New York → Paris"),
-        ("SFO", "NRT", "San Francisco → Tokyo"),
-        ("ORD", "FRA", "Chicago → Frankfurt"),
-        ("LAX", "SYD", "Los Angeles → Sydney"),
-        ("MIA", "GRU", "Miami → São Paulo")
-    ]
-
-    var body: some View {
-        VStack(spacing: 28) {
-            Text("SELECT YOUR ROUTE")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .tracking(5)
-                .foregroundStyle(.white.opacity(0.4))
-
-            // Route presets grid.
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(presets, id: \.name) { preset in
-                    let isSelected = config.departureIATA == preset.dep && config.arrivalIATA == preset.arr
-                    Button(action: {
-                        config.departureIATA = preset.dep
-                        config.arrivalIATA   = preset.arr
-                        applyIATACoordinates(dep: preset.dep, arr: preset.arr)
-                    }) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 8) {
-                                Text(preset.dep)
-                                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(isSelected ? Color(red: 1, green: 0.55, blue: 0.1) : .white)
-                                Text("→")
-                                    .foregroundStyle(.white.opacity(0.3))
-                                Text(preset.arr)
-                                    .font(.system(size: 15, weight: .semibold, design: .monospaced))
-                                    .foregroundStyle(isSelected ? Color(red: 1, green: 0.55, blue: 0.1) : .white)
-                            }
-                            Text(preset.name)
-                                .font(.system(size: 10, weight: .regular, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.35))
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(isSelected ? Color(red: 1, green: 0.55, blue: 0.1).opacity(0.12) : Color.white.opacity(0.05))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(isSelected ? Color(red: 1, green: 0.55, blue: 0.1).opacity(0.5) : Color.white.opacity(0.08), lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            .gesture(DragGesture(minimumDistance: 0)
+                .onEnded { value in
+                    let tapped = seatID(at: value.location, in: geo.size)
+                    if let id = tapped {
+                        withAnimation(.easeInOut(duration: 0.18)) { selectedSeatID = id }
                     }
-                    .animation(.easeInOut(duration: 0.15), value: isSelected)
                 }
-            }
+            )
         }
-        .padding(.horizontal, 40)
     }
 
-    private func applyIATACoordinates(dep: String, arr: String) {
-        // Hardcoded airport coords for the 6 presets.
-        let coords: [String: (Float, Float)] = [
-            "LAX": (-118.4085,  33.9425),
-            "LHR": (  -0.4543,  51.4775),
-            "JFK": ( -73.7789,  40.6413),
-            "CDG": (   2.5479,  49.0097),
-            "SFO": (-122.3789,  37.6213),
-            "NRT": ( 140.3864,  35.7647),
-            "ORD": ( -87.9048,  41.9742),
-            "FRA": (   8.5622,  50.0379),
-            "SYD": ( 151.1772, -33.9399),
-            "MIA": ( -80.2870,  25.7959),
-            "GRU": ( -46.4731, -23.4356)
+    // 1-2-1 layout: draw fuselage, aisle lines, then each seat block.
+    private func drawCabin(context: GraphicsContext, size: CGSize) {
+        let seatW: CGFloat = size.width / 14
+        let seatH: CGFloat = size.height * 0.56
+        let topY:  CGFloat = (size.height - seatH) / 2
+
+        // Fuselage outline.
+        let fuselage = RoundedRectangle(cornerRadius: 26, style: .continuous)
+        context.stroke(
+            fuselage.path(in: CGRect(x: 4, y: topY - 10, width: size.width - 8, height: seatH + 20)),
+            with: .color(.white.opacity(0.18)), lineWidth: 2
+        )
+
+        // Aisle columns (fractional x positions in the 14-unit grid).
+        let cols: [(seat: CabinSeat, xUnit: CGFloat)] = [
+            (allSeats[0], 1),   // 1A
+            (allSeats[1], 3),   // 2B  (stagger right)
+            (allSeats[2], 5.5), // 1D
+            (allSeats[3], 7),   // 2D  (stagger right)
+            (allSeats[4], 7.5), // 2G
+            (allSeats[5], 9),   // 1G
+            (allSeats[6], 11),  // 2J  (stagger right)
+            (allSeats[7], 13),  // 1L
         ]
-        if let d = coords[dep] { config.depLon = d.0; config.depLat = d.1 }
-        if let a = coords[arr] { config.arrLon = a.0; config.arrLat = a.1 }
-    }
-}
 
-// MARK: - Step 3: Timing
+        for (seat, xUnit) in cols {
+            let x = xUnit / 14 * size.width - seatW / 2
+            let staggerY: CGFloat = seat.row == 2 ? topY + seatH * 0.15 : topY
+            let h = seat.row == 2 ? seatH * 0.70 : seatH
+            let rect = CGRect(x: x, y: staggerY, width: seatW - 4, height: h)
+            let isSelected = seat.id == selectedSeatID
 
-struct TimingStep: View {
-    @Binding var config: CabinSessionConfig
+            let fill = isSelected ? Color.white : Color.white.opacity(0.10)
+            let stroke = isSelected ? Color.white : Color.white.opacity(0.28)
 
-    private let sessionOptions: [Float] = [45, 60, 90, 120, 150, 180]
-    private let sprintOptions:  [Float] = [15, 20, 25, 30, 45, 50]
-    private let breakOptions:   [Float] = [5, 7, 10, 15]
+            context.fill(
+                RoundedRectangle(cornerRadius: 8, style: .continuous).path(in: rect),
+                with: .color(fill)
+            )
+            context.stroke(
+                RoundedRectangle(cornerRadius: 8, style: .continuous).path(in: rect),
+                with: .color(stroke), lineWidth: 1.5
+            )
 
-    var body: some View {
-        VStack(spacing: 32) {
-            Text("PLAN YOUR FLIGHT")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .tracking(5)
-                .foregroundStyle(.white.opacity(0.4))
-
-            VStack(spacing: 20) {
-                TimingRow(label: "TOTAL SESSION",  unit: "min",
-                          options: sessionOptions, selected: $config.totalMinutes)
-                TimingRow(label: "SPRINT LENGTH",  unit: "min",
-                          options: sprintOptions,  selected: $config.sprintMinutes)
-                TimingRow(label: "BREAK LENGTH",   unit: "min",
-                          options: breakOptions,   selected: $config.breakMinutes)
-                TimingRow(label: "TAXI / EMAIL",   unit: "min",
-                          options: [3, 5, 7, 10],  selected: $config.taxiMinutes)
-            }
-
-            // Flight summary.
-            let sprints = Int(config.totalMinutes / (config.sprintMinutes + config.breakMinutes))
-            Text("\(sprints) SPRINTS — APPROX. \(Int(config.totalMinutes)) MIN FLIGHT")
-                .font(.system(size: 11, weight: .regular, design: .monospaced))
-                .tracking(2)
-                .foregroundStyle(Color(red: 1, green: 0.55, blue: 0.1).opacity(0.8))
+            // Seat code label.
+            context.draw(
+                Text(seat.code)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isSelected ? Color.black : Color.white.opacity(0.7)),
+                at: CGPoint(x: rect.midX, y: rect.midY)
+            )
         }
-        .padding(.horizontal, 40)
+    }
+
+    private func seatID(at point: CGPoint, in size: CGSize) -> Int? {
+        let seatW: CGFloat = size.width / 14
+        let seatH: CGFloat = size.height * 0.56
+        let topY:  CGFloat = (size.height - seatH) / 2
+
+        let cols: [(id: Int, xUnit: CGFloat)] = [
+            (0, 1), (1, 3), (2, 5.5), (3, 7),
+            (4, 7.5), (5, 9), (6, 11), (7, 13),
+        ]
+        for (id, xUnit) in cols {
+            let seat = allSeats[id]
+            let x = xUnit / 14 * size.width - seatW / 2
+            let staggerY: CGFloat = seat.row == 2 ? topY + seatH * 0.15 : topY
+            let h = seat.row == 2 ? seatH * 0.70 : seatH
+            let rect = CGRect(x: x, y: staggerY, width: seatW - 4, height: h).insetBy(dx: -8, dy: -8)
+            if rect.contains(point) { return id }
+        }
+        return nil
     }
 }
 
-struct TimingRow: View {
-    let label:   String
-    let unit:    String
-    let options: [Float]
-    @Binding var selected: Float
+// MARK: - Route Card
+
+struct RouteCard: View {
+    let preset: RoutePreset
+    let isSelected: Bool
+    let onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            Text(label)
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-                .tracking(2)
-                .foregroundStyle(.white.opacity(0.4))
-                .frame(width: 140, alignment: .trailing)
-
-            HStack(spacing: 6) {
-                ForEach(options, id: \.self) { opt in
-                    let isSelected = selected == opt
-                    Button(action: { selected = opt }) {
-                        Text("\(Int(opt))")
-                            .font(.system(size: 13, weight: isSelected ? .semibold : .regular, design: .monospaced))
-                            .foregroundStyle(isSelected ? .black : .white.opacity(0.6))
-                            .frame(width: 44, height: 34)
-                            .background(isSelected ? Color(red: 1, green: 0.55, blue: 0.1) : Color.white.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    .animation(.easeInOut(duration: 0.12), value: isSelected)
+        Button(action: onTap) {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(preset.label)
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isSelected ? .black : .white)
+                    Text("\(preset.depName) \u2192 \(preset.arrName)")
+                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .foregroundStyle(isSelected ? Color.black.opacity(0.58) : Color.white.opacity(0.48))
                 }
+                Spacer()
+                Text(String(format: "%.1f hr", preset.durationHours))
+                    .font(.system(size: 18, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(isSelected ? .black : .white.opacity(0.7))
             }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 18)
+            .background(
+                isSelected ? Color.white : Color.white.opacity(0.05),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(isSelected ? Color.clear : Color.white.opacity(0.1), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Onboarding Step
+
+enum OnboardingStep {
+    case seatSelection, routeConfig, sessionConfig
+
+    var subtitle: String {
+        switch self {
+        case .seatSelection: return "Choose your seat"
+        case .routeConfig:   return "Select your route"
+        case .sessionConfig: return "Configure your flight"
+        }
+    }
+    var next: OnboardingStep {
+        switch self {
+        case .seatSelection: return .routeConfig
+        case .routeConfig:   return .sessionConfig
+        case .sessionConfig: return .sessionConfig
+        }
+    }
+    var previous: OnboardingStep {
+        switch self {
+        case .seatSelection: return .seatSelection
+        case .routeConfig:   return .seatSelection
+        case .sessionConfig: return .routeConfig
         }
     }
 }
