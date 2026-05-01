@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.3",
+	"EngineAssociation": "5.7",
 	"Category": "Applications",
 	"Description": "Cabin — Gate-to-gate diegetic focus environment. Photorealistic business-class suite rendered in UE5 Lumen + Nanite, exported to iPadOS via the CabinBridge Metal plugin.",
 
@@ -40,6 +40,11 @@
 			"Name": "TemporalSuperResolution",
 			"Enabled": true
 		},
+		/* Path Tracing: available in UE 5.7 on Metal 3 (M2+). Off by default; enable for still captures. */
+		{
+			"Name": "PathTracing",
+			"Enabled": false
+		},
 
 		/* ── VFX ── */
 		{
@@ -60,26 +65,11 @@
 			"Name": "Metasound",
 			"Enabled": true
 		},
-		{
-			"Name": "AudioSynesthesia",
-			"Enabled": false
-		},
 
 		/* ── Animation & Sequencer ── */
 		{
 			"Name": "SequencerAnimTools",
 			"Enabled": true
-		},
-		{
-			"Name": "FullBodyIK",
-			"Enabled": false
-		},
-
-		/* ── Sky & Atmosphere ── */
-		{
-			"Name": "SkyCreator",
-			"Enabled": false,
-			"Comment": "Optional third-party sky plugin. CabinWindowSystem uses native UE5 SkyAtmosphere + VolumetricCloud + video plate compositing instead."
 		},
 
 		/* ── Geometry & Content ── */
