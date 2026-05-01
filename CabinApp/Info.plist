@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+    <!-- MARK: - App identity -->
+    <key>CFBundleDisplayName</key>
+    <string>Cabin</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <!-- MARK: - Supported platforms -->
+    <!-- iPad: landscape primary, portrait supported -->
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <!-- Mac Catalyst: no rotation needed -->
+    <key>UISupportedInterfaceOrientations~mac</key>
+    <array>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <!-- iPhone: landscape only (edge case support) -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- MARK: - iPad Multitasking (Split View + Slide Over + PiP) -->
+    <!-- Required for Split View and Slide Over support. -->
+    <key>UIRequiresFullScreen</key>
+    <false/>
+    <!-- PiP is enabled automatically when UIRequiresFullScreen is false
+         and AVPictureInPictureController is used. -->
+
+    <!-- MARK: - Background Modes -->
+    <!-- audio: keeps AVAudioEngine cabin hum alive in background / Split View -->
+    <!-- processing: allows background timer tick for session counting -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>audio</string>
+        <string>processing</string>
+    </array>
+
+    <!-- MARK: - Privacy Usage Strings -->
+    <!-- Required by App Store Review even if permission is optional. -->
+    <key>NSMotionUsageDescription</key>
+    <string>Cabin uses the gyroscope to let you look around the aircraft cabin by tilting your iPad.</string>
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Cabin does not use the microphone. This key satisfies App Store requirements for apps with audio frameworks linked.</string>
+
+    <!-- MARK: - Scene configuration (UIWindowScene / SwiftUI) -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <true/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>Default Configuration</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+
+    <!-- MARK: - Status bar -->
+    <key>UIStatusBarHidden</key>
+    <true/>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+
+    <!-- MARK: - ProMotion / high frame rate display -->
+    <!-- CADisableMinimumFrameDurationOnPhone suppresses the 60fps cap on iPhone
+         so the 120Hz CADisplayLink can run at full ProMotion rate. -->
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+
+    <!-- MARK: - Metal / GPU -->
+    <!-- Suppress the on-screen GPU frame capture HUD in release builds. -->
+    <key>MetalCaptureEnabled</key>
+    <false/>
+    <!-- Prefer the high-power GPU on devices with discrete / APU splits. -->
+    <key>MTLDefaultGPUPreference</key>
+    <string>HighPower</string>
+
+    <!-- MARK: - Launch screen -->
+    <!-- Simple black launch screen matches the boarding environment. -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+
+    <!-- MARK: - App Transport Security -->
+    <!-- No remote fetches at runtime; ATS default is fine. -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
+
+    <!-- MARK: - Background task scheduler identifier -->
+    <!-- Used by BGTaskScheduler for the background timer if needed. -->
+    <key>BGTaskSchedulerPermittedIdentifiers</key>
+    <array>
+        <string>com.cabin.sessiontimer</string>
+    </array>
+
+    <!-- MARK: - Fonts -->
+    <!-- No custom fonts bundled; system SF Rounded used throughout. -->
+
+</dict>
+</plist>
