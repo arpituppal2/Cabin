@@ -1,55 +1,127 @@
 {
-    "FileVersion": 3,
-    "EngineAssociation": "5.3",
-    "Category": "Application",
-    "Description": "Cabin — Gate-to-Gate Diegetic Focus Environment",
+	"FileVersion": 3,
+	"EngineAssociation": "5.3",
+	"Category": "Applications",
+	"Description": "Cabin — Gate-to-gate diegetic focus environment. Photorealistic business-class suite rendered in UE5 Lumen + Nanite, exported to iPadOS via the CabinBridge Metal plugin.",
 
-    "Modules": [
-        {
-            "Name": "CabinEngine",
-            "Type": "Runtime",
-            "LoadingPhase": "Default",
-            "AdditionalDependencies": [
-                "Engine",
-                "CoreUObject",
-                "RenderCore",
-                "RHI",
-                "Renderer"
-            ]
-        }
-    ],
+	"Modules": [
+		{
+			"Name": "CabinEngine",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine",
+				"CoreUObject",
+				"InputCore"
+			]
+		}
+	],
 
-    "Plugins": [
-        {
-            "Name": "CabinBridge",
-            "Enabled": true
-        },
-        {
-            "Name": "Niagara",
-            "Enabled": true
-        },
-        {
-            "Name": "GeometryProcessing",
-            "Enabled": true
-        },
-        {
-            "Name": "ChaosVehiclesPlugin",
-            "Enabled": false
-        },
-        {
-            "Name": "Paper2D",
-            "Enabled": false
-        },
-        {
-            "Name": "AndroidMedia",
-            "Enabled": false
-        }
-    ],
+	"Plugins": [
+		{
+			"Name": "CabinBridge",
+			"Enabled": true
+		},
 
-    "TargetPlatforms": [
-        "IOS",
-        "Mac"
-    ],
+		/* ── Rendering ── */
+		{
+			"Name": "Lumen",
+			"Enabled": true
+		},
+		{
+			"Name": "NaniteDisplacedMesh",
+			"Enabled": true
+		},
+		{
+			"Name": "VirtualShadowMaps",
+			"Enabled": true
+		},
+		{
+			"Name": "TemporalSuperResolution",
+			"Enabled": true
+		},
 
-    "EpicSampleNameHash": "0"
+		/* ── VFX ── */
+		{
+			"Name": "Niagara",
+			"Enabled": true
+		},
+		{
+			"Name": "NiagaraExtras",
+			"Enabled": true
+		},
+
+		/* ── Audio ── */
+		{
+			"Name": "AudioGameplay",
+			"Enabled": true
+		},
+		{
+			"Name": "Metasound",
+			"Enabled": true
+		},
+		{
+			"Name": "AudioSynesthesia",
+			"Enabled": false
+		},
+
+		/* ── Animation & Sequencer ── */
+		{
+			"Name": "SequencerAnimTools",
+			"Enabled": true
+		},
+		{
+			"Name": "FullBodyIK",
+			"Enabled": false
+		},
+
+		/* ── Sky & Atmosphere ── */
+		{
+			"Name": "SkyCreator",
+			"Enabled": false,
+			"Comment": "Optional third-party sky plugin. CabinWindowSystem uses native UE5 SkyAtmosphere + VolumetricCloud + video plate compositing instead."
+		},
+
+		/* ── Geometry & Content ── */
+		{
+			"Name": "GeometryScripting",
+			"Enabled": true
+		},
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true
+		},
+
+		/* ── Developer utilities (editor-only) ── */
+		{
+			"Name": "DatasmithContent",
+			"Enabled": true
+		},
+		{
+			"Name": "GLTFExporter",
+			"Enabled": true
+		},
+
+		/* ── Disabled defaults (reduce cook time) ── */
+		{
+			"Name": "Paper2D",
+			"Enabled": false
+		},
+		{
+			"Name": "OnlineSubsystem",
+			"Enabled": false
+		},
+		{
+			"Name": "OnlineSubsystemUtils",
+			"Enabled": false
+		},
+		{
+			"Name": "AndroidPermission",
+			"Enabled": false
+		},
+		{
+			"Name": "MobilePatchingUtils",
+			"Enabled": false
+		}
+	]
 }
