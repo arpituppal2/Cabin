@@ -4,138 +4,119 @@ import { WindowView } from './WindowView.js';
 import { CameraRig } from './CameraRig.js';
 
 const PHASE_LIGHTING = {
-  ONBOARDING: { dirColor: 0xfff5e0, dirIntensity: 1.6, ambColor: 0xd0d8e8, ambIntensity: 0.9 },
-  BOARDING:   { dirColor: 0xfff5f0, dirIntensity: 1.6, ambColor: 0xd0d8e8, ambIntensity: 0.9 },
-  TAXI:       { dirColor: 0x8090d0, dirIntensity: 1.1, ambColor: 0x303860, ambIntensity: 0.6 },
-  TAKEOFF:    { dirColor: 0x9090e0, dirIntensity: 1.2, ambColor: 0x404870, ambIntensity: 0.6 },
-  CRUISE:     { dirColor: 0xfff5e0, dirIntensity: 0.9, ambColor: 0x202840, ambIntensity: 0.5 },
-  BREAK:      { dirColor: 0xfff5e0, dirIntensity: 0.9, ambColor: 0x202840, ambIntensity: 0.5 },
-  DESCENT:    { dirColor: 0xffa860, dirIntensity: 1.3, ambColor: 0x503020, ambIntensity: 0.6 },
-  LANDING:    { dirColor: 0xffe8c0, dirIntensity: 1.4, ambColor: 0x604030, ambIntensity: 0.65 },
-  ARRIVED:    { dirColor: 0xfff5f0, dirIntensity: 1.6, ambColor: 0xd0d8e8, ambIntensity: 0.9 }
+  BOARDING: { ambColor: 0x2a2860, ambInt: 0.55, dirInt: 1.0 },
+  TAXI:     { ambColor: 0x2a2860, ambInt: 0.58, dirInt: 1.05 },
+  TAKEOFF:  { ambColor: 0x202060, ambInt: 0.60, dirInt: 1.15 },
+  CRUISE:   { ambColor: 0x181840, ambInt: 0.45, dirInt: 1.2  },
+  BREAK:    { ambColor: 0x181840, ambInt: 0.45, dirInt: 1.2  },
+  DESCENT:  { ambColor: 0x1a1a40, ambInt: 0.50, dirInt: 1.1  },
+  LANDING:  { ambColor: 0x2a2860, ambInt: 0.60, dirInt: 1.05 },
+  ARRIVED:  { ambColor: 0x303060, ambInt: 0.70, dirInt: 0.95 },
 };
 
 export class CabinScene {
   constructor(canvas, seatId) {
-    this.canvas = canvas;
-    this.seatId = seatId || '1A';
-    this.renderer = null;
-    this.scene = null;
-    this.camera = null;
-    this.cameraRig = null;
-    this.cabinGeometry = null;
-    this.windowView = null;
-    this.dirLight = null;
-    this.ambLight = null;
-    this.ifeLight = null;
-    this.cubbyLight = null;
-    this.hemiLight = null;
-    this._targetLighting = null;
-    this._currentLighting = null;
-    this._lerpT = 1;
+    this.canvas  = canvas;
+    this.seatId  = seatId || '1A';
     this._animId = null;
-    this._lastTime = 0;
+    this._phase  = 'BOARDING';
+    this._lerpT  = 1;
+    this._curLighting = null;
+    this._tgtLighting = null;
     this._onResize = this._onResize.bind(this);
   }
 
   init() {
-    this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-      antialias: true,
-      powerPreference: 'high-performance'
-    });
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
-    this.renderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
-    this.renderer.shadowMap.enabled = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.8;
+    this.renderer.toneMappingExposure = 1.15;
 
-    this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x0d0d10, 10, 22);
+    this.scene  = new THREE.Scene();
+    this.scene.fog = new THREE.FogExp2(0x05050f, 0.16);
 
-    this.camera = new THREE.PerspectiveCamera(
-      65,
-      this.canvas.clientWidth / this.canvas.clientHeight,
-      0.01,
-      30
-    );
-    this.camera.position.set(0, 0.55, 0);
+    this.camera = new THREE.PerspectiveCamera(68, 1, 0.01, 30);
+    this.camera.position.set(0, 0.9, 0);
+    this.camera.lookAt(0, 0.85, -2.5);
 
     this._buildLighting();
 
-    this.windowView = new WindowView();
+    this.windowView   = new WindowView();
     this.cabinGeometry = new CabinGeometry(this.scene, this.windowView, this.seatId);
-    this.cameraRig = new CameraRig(this.camera, this.canvas);
-    this.cameraRig.basePosition.set(0, 0.55, 0);
+    this.cameraRig    = new CameraRig(this.camera, this.canvas);
+    this.cameraRig.basePosition.set(0, 0.9, 0);
 
-    this._currentLighting = { ...PHASE_LIGHTING.BOARDING };
-    this._targetLighting = { ...PHASE_LIGHTING.BOARDING };
-    this._applyLighting(this._currentLighting);
+    const lp = PHASE_LIGHTING.BOARDING;
+    this._curLighting = { ...lp };
+    this._tgtLighting = { ...lp };
+    this._applyLighting(lp);
 
     window.addEventListener('resize', this._onResize, { passive: true });
   }
 
   _buildLighting() {
-    this.dirLight = new THREE.DirectionalLight(0xfff5e0, 1.5);
-    this.dirLight.position.set(1, 3, 1);
-    this.scene.add(this.dirLight);
-
-    this.ambLight = new THREE.AmbientLight(0xd0d8e8, 0.9);
+    this.ambLight = new THREE.AmbientLight(0x2a2860, 0.55);
     this.scene.add(this.ambLight);
 
-    this.overheadA = new THREE.PointLight(0xfff8f0, 1.8, 4.0);
-    this.overheadA.position.set(0, 1.4, -0.5);
-    this.scene.add(this.overheadA);
+    this.dirLight = new THREE.DirectionalLight(0xfff5e0, 1.0);
+    this.dirLight.position.set(2, 4, 3);
+    this.scene.add(this.dirLight);
 
-    this.overheadB = new THREE.PointLight(0xfff8f0, 1.0, 5.0);
-    this.overheadB.position.set(0, 1.4, -1.8);
-    this.scene.add(this.overheadB);
+    this.consoleLamp = new THREE.PointLight(0xffe4a0, 0.75, 3.5);
+    this.consoleLamp.position.set(0.88, 1.08, -0.3);
+    this.scene.add(this.consoleLamp);
 
-    this.ifeLight = new THREE.PointLight(0x4080c0, 0.35, 2.5);
-    this.ifeLight.position.set(0, 0.55, -1.05);
-    this.scene.add(this.ifeLight);
+    this.overheadMood = new THREE.PointLight(0x4060ff, 0.2, 4.5);
+    this.overheadMood.position.set(0, 1.88, -0.5);
+    this.scene.add(this.overheadMood);
 
-    this.cubbyLight = new THREE.PointLight(0xffe4a0, 0.5, 1.2);
-    this.cubbyLight.position.set(-0.62, 0.06, -0.5);
-    this.scene.add(this.cubbyLight);
+    this.ifeGlow = new THREE.PointLight(0xf0c040, 0.25, 3.0);
+    this.ifeGlow.position.set(0, 0.9, -1.6);
+    this.scene.add(this.ifeGlow);
 
-    this.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x1a1a20, 0.25);
-    this.scene.add(this.hemiLight);
+    const fill = new THREE.PointLight(0xa0b8ff, 0.14, 5);
+    fill.position.set(-1.0, 1.2, -1.0);
+    this.scene.add(fill);
   }
 
-  _applyLighting(config) {
-    if (this.dirLight) {
-      this.dirLight.color.set(config.dirColor);
-      this.dirLight.intensity = config.dirIntensity;
-    }
+  _applyLighting(p) {
     if (this.ambLight) {
-      this.ambLight.color.set(config.ambColor);
-      this.ambLight.intensity = config.ambIntensity;
+      this.ambLight.color.setHex(p.ambColor);
+      this.ambLight.intensity = p.ambInt;
     }
+    if (this.dirLight) this.dirLight.intensity = p.dirInt;
   }
 
   setPhase(phase) {
-    const target = PHASE_LIGHTING[phase] || PHASE_LIGHTING.BOARDING;
-    this._targetLighting = { ...target };
+    const tgt = PHASE_LIGHTING[phase] || PHASE_LIGHTING.CRUISE;
+    this._tgtLighting = { ...tgt };
+    this._curLighting = {
+      ambColor: this.ambLight ? this.ambLight.color.getHex() : tgt.ambColor,
+      ambInt:   this.ambLight ? this.ambLight.intensity : tgt.ambInt,
+      dirInt:   this.dirLight ? this.dirLight.intensity : tgt.dirInt,
+    };
     this._lerpT = 0;
+    this._phase = phase;
 
-    const seatbeltPhases = ['TAXI', 'TAKEOFF', 'DESCENT', 'LANDING'];
-    if (this.cabinGeometry) {
-      this.cabinGeometry.setSeatbeltSign(seatbeltPhases.includes(phase));
-    }
-    if (this.windowView) {
-      this.windowView.setPhase(phase);
+    const sbOn = ['TAXI','TAKEOFF','DESCENT','LANDING'].includes(phase);
+    if (this.cabinGeometry) this.cabinGeometry.setSeatbeltSign(sbOn);
+    if (this.windowView)    this.windowView.setPhase(phase);
+
+    if (phase === 'LANDING' || phase === 'ARRIVED') {
+      this.consoleLamp.intensity = 0.45;
+    } else {
+      this.consoleLamp.intensity = 0.75;
     }
   }
 
   startRender() {
     this._onResize();
-    this._lastTime = performance.now();
-    const loop = (time) => {
+    let last = performance.now();
+    const loop = (now) => {
       this._animId = requestAnimationFrame(loop);
-      const dt = Math.min((time - this._lastTime) / 1000, 0.05);
-      this._lastTime = time;
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
       this._update(dt);
       this.renderer.render(this.scene, this.camera);
     };
@@ -144,46 +125,31 @@ export class CabinScene {
 
   _update(dt) {
     if (this._lerpT < 1) {
-      this._lerpT = Math.min(1, this._lerpT + dt / 2.0);
-      const t = this._lerpT;
-      const cur = this._currentLighting;
-      const tgt = this._targetLighting;
-
-      const lerpedDir = new THREE.Color(cur.dirColor).lerp(new THREE.Color(tgt.dirColor), t);
-      const lerpedAmb = new THREE.Color(cur.ambColor).lerp(new THREE.Color(tgt.ambColor), t);
-
-      if (this.dirLight) {
-        this.dirLight.color.copy(lerpedDir);
-        this.dirLight.intensity = cur.dirIntensity + (tgt.dirIntensity - cur.dirIntensity) * t;
-      }
+      this._lerpT = Math.min(1, this._lerpT + dt / 2.5);
+      const t  = this._lerpT;
+      const c  = this._curLighting, tg = this._tgtLighting;
       if (this.ambLight) {
-        this.ambLight.color.copy(lerpedAmb);
-        this.ambLight.intensity = cur.ambIntensity + (tgt.ambIntensity - cur.ambIntensity) * t;
+        this.ambLight.color.lerp(new THREE.Color(tg.ambColor), t * 0.1);
+        this.ambLight.intensity = c.ambInt + (tg.ambInt - c.ambInt) * t;
       }
-      if (t >= 1) {
-        this._currentLighting = { ...this._targetLighting };
+      if (this.dirLight) {
+        this.dirLight.intensity = c.dirInt + (tg.dirInt - c.dirInt) * t;
       }
     }
-
     if (this.windowView) {
       this.windowView.update(dt);
-      const yaw = this.cameraRig ? this.cameraRig.getYawFraction() : 0;
-      this.windowView.setParallax(yaw);
+      if (this.cameraRig) this.windowView.setParallax(this.cameraRig.getYawFraction());
     }
-
-    if (this.cameraRig) this.cameraRig.update(dt);
+    if (this.cameraRig)    this.cameraRig.update(dt);
     if (this.cabinGeometry) this.cabinGeometry.update(dt);
   }
 
   _onResize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    if (!w || !h) return;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
-  }
-
-  setIFEEmissive(color) {
-    if (this.ifeLight) this.ifeLight.color.set(color);
   }
 
   destroy() {
@@ -191,4 +157,7 @@ export class CabinScene {
     window.removeEventListener('resize', this._onResize);
     if (this.renderer) this.renderer.dispose();
   }
+
+  get hotspotMeshes()  { return this.cabinGeometry ? this.cabinGeometry.hotspotMeshes : []; }
+  get cameraObject()   { return this.camera; }
 }

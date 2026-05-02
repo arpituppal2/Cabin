@@ -107,10 +107,14 @@ class CabinApp {
 
     hs.on('seatBtn', (mesh) => {
       audio.playButtonClick();
-      const labels = ['Upright', 'Lounge', 'Bed', 'Lumbar'];
       const idx = mesh.userData.btnIndex || 0;
-      this._showToast(labels[idx] + ' mode');
-      this._animateSeatBtn(mesh);
+      const label = mesh.userData.btnLabel || ['Upright','Lounge','Bed','Lumbar'][idx];
+      geo.animateSeatBtn(idx);
+      this._showToast(label + ' mode');
+      if (label === 'Bed' && this.scene && this.scene.ambLight) {
+        this.scene.ambLight.intensity = 0.28;
+        this.scene.consoleLamp.intensity = 0.35;
+      }
     });
 
     hs.on('cubbyDoor', () => {

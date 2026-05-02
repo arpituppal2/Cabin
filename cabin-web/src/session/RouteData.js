@@ -1,192 +1,64 @@
-export const ROUTES = [
-  {
-    id: 'LAX-LHR',
-    origin: 'LAX', destination: 'LHR',
-    originCity: 'Los Angeles', destinationCity: 'London',
-    originName: 'Los Angeles International', destinationName: 'London Heathrow',
-    distanceNm: 5456, flightTimeMin: 620,
-    cruiseAltitudeFt: 37000, cruiseSpeedKts: 545,
-    originTZ: -8, destinationTZ: 0
-  },
-  {
-    id: 'JFK-NRT',
-    origin: 'JFK', destination: 'NRT',
-    originCity: 'New York', destinationCity: 'Tokyo',
-    originName: 'John F. Kennedy International', destinationName: 'Tokyo Narita',
-    distanceNm: 6740, flightTimeMin: 790,
-    cruiseAltitudeFt: 39000, cruiseSpeedKts: 530,
-    originTZ: -5, destinationTZ: 9
-  },
-  {
-    id: 'SFO-SIN',
-    origin: 'SFO', destination: 'SIN',
-    originCity: 'San Francisco', destinationCity: 'Singapore',
-    originName: 'San Francisco International', destinationName: 'Singapore Changi',
-    distanceNm: 8446, flightTimeMin: 1020,
-    cruiseAltitudeFt: 41000, cruiseSpeedKts: 555,
-    originTZ: -8, destinationTZ: 8
-  },
-  {
-    id: 'LAX-SYD',
-    origin: 'LAX', destination: 'SYD',
-    originCity: 'Los Angeles', destinationCity: 'Sydney',
-    originName: 'Los Angeles International', destinationName: 'Sydney Kingsford Smith',
-    distanceNm: 7480, flightTimeMin: 900,
-    cruiseAltitudeFt: 39000, cruiseSpeedKts: 540,
-    originTZ: -8, destinationTZ: 11
-  },
-  {
-    id: 'ORD-DXB',
-    origin: 'ORD', destination: 'DXB',
-    originCity: 'Chicago', destinationCity: 'Dubai',
-    originName: "Chicago O'Hare International", destinationName: 'Dubai International',
-    distanceNm: 6288, flightTimeMin: 740,
-    cruiseAltitudeFt: 38000, cruiseSpeedKts: 540,
-    originTZ: -6, destinationTZ: 4
-  },
-  {
-    id: 'MIA-GRU',
-    origin: 'MIA', destination: 'GRU',
-    originCity: 'Miami', destinationCity: 'São Paulo',
-    originName: 'Miami International', destinationName: 'São Paulo Guarulhos',
-    distanceNm: 3760, flightTimeMin: 450,
-    cruiseAltitudeFt: 36000, cruiseSpeedKts: 520,
-    originTZ: -5, destinationTZ: -3
-  },
-  {
-    id: 'LHR-HKG',
-    origin: 'LHR', destination: 'HKG',
-    originCity: 'London', destinationCity: 'Hong Kong',
-    originName: 'London Heathrow', destinationName: 'Hong Kong International',
-    distanceNm: 5982, flightTimeMin: 700,
-    cruiseAltitudeFt: 38000, cruiseSpeedKts: 550,
-    originTZ: 0, destinationTZ: 8
-  },
-  {
-    id: 'CDG-NRT',
-    origin: 'CDG', destination: 'NRT',
-    originCity: 'Paris', destinationCity: 'Tokyo',
-    originName: 'Paris Charles de Gaulle', destinationName: 'Tokyo Narita',
-    distanceNm: 5990, flightTimeMin: 720,
-    cruiseAltitudeFt: 39000, cruiseSpeedKts: 540,
-    originTZ: 1, destinationTZ: 9
-  },
-  {
-    id: 'SYD-DXB',
-    origin: 'SYD', destination: 'DXB',
-    originCity: 'Sydney', destinationCity: 'Dubai',
-    originName: 'Sydney Kingsford Smith', destinationName: 'Dubai International',
-    distanceNm: 7480, flightTimeMin: 880,
-    cruiseAltitudeFt: 40000, cruiseSpeedKts: 550,
-    originTZ: 11, destinationTZ: 4
-  },
-  {
-    id: 'JFK-CDG',
-    origin: 'JFK', destination: 'CDG',
-    originCity: 'New York', destinationCity: 'Paris',
-    originName: 'John F. Kennedy International', destinationName: 'Paris Charles de Gaulle',
-    distanceNm: 3625, flightTimeMin: 440,
-    cruiseAltitudeFt: 36000, cruiseSpeedKts: 520,
-    originTZ: -5, destinationTZ: 1
-  },
-  {
-    id: 'SIN-LHR',
-    origin: 'SIN', destination: 'LHR',
-    originCity: 'Singapore', destinationCity: 'London',
-    originName: 'Singapore Changi', destinationName: 'London Heathrow',
-    distanceNm: 6757, flightTimeMin: 800,
-    cruiseAltitudeFt: 41000, cruiseSpeedKts: 560,
-    originTZ: 8, destinationTZ: 0
-  },
-  {
-    id: 'DXB-BKK',
-    origin: 'DXB', destination: 'BKK',
-    originCity: 'Dubai', destinationCity: 'Bangkok',
-    originName: 'Dubai International', destinationName: 'Bangkok Suvarnabhumi',
-    distanceNm: 3019, flightTimeMin: 380,
-    cruiseAltitudeFt: 36000, cruiseSpeedKts: 510,
-    originTZ: 4, destinationTZ: 7
-  },
-  {
-    id: 'LAX-TPE',
-    origin: 'LAX', destination: 'TPE',
-    originCity: 'Los Angeles', destinationCity: 'Taipei',
-    originName: 'Los Angeles International', destinationName: 'Taipei Taoyuan',
-    distanceNm: 6020, flightTimeMin: 720,
-    cruiseAltitudeFt: 39000, cruiseSpeedKts: 540,
-    originTZ: -8, destinationTZ: 8
-  },
-  {
-    id: 'FRA-PEK',
-    origin: 'FRA', destination: 'PEK',
-    originCity: 'Frankfurt', destinationCity: 'Beijing',
-    originName: 'Frankfurt am Main', destinationName: 'Beijing Capital',
-    distanceNm: 4747, flightTimeMin: 580,
-    cruiseAltitudeFt: 38000, cruiseSpeedKts: 530,
-    originTZ: 1, destinationTZ: 8
-  },
-  {
-    id: 'NYC-SCL',
-    origin: 'JFK', destination: 'SCL',
-    originCity: 'New York', destinationCity: 'Santiago',
-    originName: 'John F. Kennedy International', destinationName: 'Santiago Arturo Merino',
-    distanceNm: 5090, flightTimeMin: 620,
-    cruiseAltitudeFt: 37000, cruiseSpeedKts: 530,
-    originTZ: -5, destinationTZ: -3
-  },
-  {
-    id: 'ORD-NRT',
-    origin: 'ORD', destination: 'NRT',
-    originCity: 'Chicago', destinationCity: 'Tokyo',
-    originName: "Chicago O'Hare International", destinationName: 'Tokyo Narita',
-    distanceNm: 6290, flightTimeMin: 740,
-    cruiseAltitudeFt: 39000, cruiseSpeedKts: 545,
-    originTZ: -6, destinationTZ: 9
-  },
-  {
-    id: 'LHR-JNB',
-    origin: 'LHR', destination: 'JNB',
-    originCity: 'London', destinationCity: 'Johannesburg',
-    originName: 'London Heathrow', destinationName: 'Johannesburg OR Tambo',
-    distanceNm: 5619, flightTimeMin: 660,
-    cruiseAltitudeFt: 37000, cruiseSpeedKts: 535,
-    originTZ: 0, destinationTZ: 2
-  },
-  {
-    id: 'AMS-EZE',
-    origin: 'AMS', destination: 'EZE',
-    originCity: 'Amsterdam', destinationCity: 'Buenos Aires',
-    originName: 'Amsterdam Schiphol', destinationName: 'Buenos Aires Ezeiza',
-    distanceNm: 7120, flightTimeMin: 840,
-    cruiseAltitudeFt: 39000, cruiseSpeedKts: 545,
-    originTZ: 1, destinationTZ: -3
-  },
-  {
-    id: 'SFO-LHR',
-    origin: 'SFO', destination: 'LHR',
-    originCity: 'San Francisco', destinationCity: 'London',
-    originName: 'San Francisco International', destinationName: 'London Heathrow',
-    distanceNm: 5357, flightTimeMin: 630,
-    cruiseAltitudeFt: 37000, cruiseSpeedKts: 540,
-    originTZ: -8, destinationTZ: 0
-  },
-  {
-    id: 'DXB-SYD',
-    origin: 'DXB', destination: 'SYD',
-    originCity: 'Dubai', destinationCity: 'Sydney',
-    originName: 'Dubai International', destinationName: 'Sydney Kingsford Smith',
-    distanceNm: 7480, flightTimeMin: 880,
-    cruiseAltitudeFt: 41000, cruiseSpeedKts: 555,
-    originTZ: 4, destinationTZ: 11
-  }
-];
+export const AIRPORTS = {
+  LAX: { lat: 33.94, lon: -118.41, city: 'Los Angeles',  name: 'Los Angeles Intl' },
+  JFK: { lat: 40.64, lon: -73.78,  city: 'New York',     name: 'John F Kennedy Intl' },
+  LHR: { lat: 51.48, lon: -0.45,   city: 'London',       name: 'Heathrow' },
+  CDG: { lat: 49.01, lon: 2.55,    city: 'Paris',        name: 'Charles de Gaulle' },
+  NRT: { lat: 35.76, lon: 140.39,  city: 'Tokyo',        name: 'Narita Intl' },
+  SIN: { lat: 1.36,  lon: 103.99,  city: 'Singapore',    name: 'Changi' },
+  DXB: { lat: 25.25, lon: 55.36,   city: 'Dubai',        name: 'Dubai Intl' },
+  SYD: { lat: -33.95,lon: 151.18,  city: 'Sydney',       name: 'Kingsford Smith' },
+  HKG: { lat: 22.31, lon: 113.91,  city: 'Hong Kong',    name: 'Hong Kong Intl' },
+  ORD: { lat: 41.98, lon: -87.90,  city: 'Chicago',      name: "O'Hare Intl" },
+  MIA: { lat: 25.79, lon: -80.29,  city: 'Miami',        name: 'Miami Intl' },
+  GRU: { lat: -23.43,lon: -46.47,  city: 'São Paulo',    name: 'Guarulhos Intl' },
+  FRA: { lat: 50.04, lon: 8.57,    city: 'Frankfurt',    name: 'Frankfurt Intl' },
+  AMS: { lat: 52.31, lon: 4.77,    city: 'Amsterdam',    name: 'Schiphol' },
+  ICN: { lat: 37.46, lon: 126.44,  city: 'Seoul',        name: 'Incheon Intl' },
+  BOM: { lat: 19.09, lon: 72.87,   city: 'Mumbai',       name: 'Chhatrapati Shivaji' },
+  MEX: { lat: 19.44, lon: -99.07,  city: 'Mexico City',  name: 'Benito Juárez Intl' },
+  EZE: { lat: -34.82,lon: -58.54,  city: 'Buenos Aires', name: 'Ezeiza Intl' },
+  CPT: { lat: -33.97,lon: 18.60,   city: 'Cape Town',    name: 'Cape Town Intl' },
+  NBO: { lat: -1.32, lon: 36.93,   city: 'Nairobi',      name: 'Jomo Kenyatta Intl' },
+  YYZ: { lat: 43.68, lon: -79.63,  city: 'Toronto',      name: 'Pearson Intl' },
+  BKK: { lat: 13.68, lon: 100.75,  city: 'Bangkok',      name: 'Suvarnabhumi' },
+  ZRH: { lat: 47.45, lon: 8.55,    city: 'Zurich',       name: 'Zurich Airport' },
+  FCO: { lat: 41.80, lon: 12.24,   city: 'Rome',         name: 'Fiumicino' },
+};
 
-export function getRouteById(id) {
-  return ROUTES.find(r => r.id === id) || ROUTES[0];
+export function haversineNm(lat1, lon1, lat2, lon2) {
+  const R = 3443.9;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+export function computeFlightTimeMin(nm) {
+  return Math.round((nm / 490) * 60 * 1.06);
+}
+
+export const ROUTES = [];
+
+export function buildRoute(originCode, destCode) {
+  const A = AIRPORTS[originCode];
+  const B = AIRPORTS[destCode];
+  if (!A || !B) return null;
+  const nm = haversineNm(A.lat, A.lon, B.lat, B.lon);
+  const min = computeFlightTimeMin(nm);
+  return {
+    id: `${originCode}-${destCode}`,
+    origin: originCode, destination: destCode,
+    originCity: A.city, destinationCity: B.city,
+    originName: A.name, destinationName: B.name,
+    distanceNm: nm, flightTimeMin: min,
+    cruiseAltitudeFt: 38000, cruiseSpeedKts: 490,
+    originTZ: 0, destinationTZ: 0
+  };
 }
 
 export function formatFlightTime(minutes) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return `${h}h ${m.toString().padStart(2,'0')}m`;
+  return `${h}h ${m.toString().padStart(2, '0')}m`;
 }
