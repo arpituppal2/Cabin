@@ -1,0 +1,324 @@
+Fix the following four specific failures. Each section is a complete rewrite of that module. Do not touch anything else.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 1: TIMER — It must actually count down in real time
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The timer is broken. Rewrite SessionEngine.js timer logic from scratch.
+
+Use this exact pattern — no other approach:
+
+  let lastTimestamp = null;
+
+  function tick(timestamp) {
+    if (lastTimestamp !== null) {
+      const deltaMs = timestamp - lastTimestamp;
+      state.elapsedMs += deltaMs;
+    }
+    lastTimestamp = timestamp;
+    updatePhase();
+    updateUI();
+    requestAnimationFrame(tick);
+  }
+
+  requestAnimationFrame(tick);
+
+state.elapsedMs is a number starting at 0 and growing in real milliseconds.
+Sprint remaining = (state.sprintDurationMs - (state.elapsedMs % (state.sprintDurationMs + state.breakDurationMs)))
+Format for display: Math.floor(remaining / 60000) + ':' + String(Math.floor((remaining % 60000) / 1000)).padStart(2, '0')
+
+The Big Clock IFE mode must re-render every animation frame by reading state.elapsedMs directly.
+Do NOT use setInterval. Do NOT use setTimeout for the timer. Only requestAnimationFrame.
+
+The IFE clock display element must be updated inside the requestAnimationFrame loop:
+  document.getElementById('ife-clock-display').textContent = formatTime(sprintRemaining);
+
+Test: open the CLOCK tab on the IFE. The number must visibly count down second by second in real time.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 2: FLIGHT MAP — Use a real tile-based map, not drawn polygons
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Replace all hand-drawn continent polygon code entirely.
+
+Use Leaflet.js with OpenStreetMap tiles for the flight map. This is free, requires no API key, and works in any browser.
+
+In index.html add to <head>:
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+In the IFE MAP mode panel, render:
+  <div id="ife-map" style="width:100%; height:340px; border-radius:8px; overflow:hidden;"></div>
+
+Initialize the map in IFEScreen.js when MAP mode is activated:
+
+  let cabinMap = null;
+  let flightArc = null;
+  let planeMarker = null;
+
+  function initMap(origin, destination) {
+    if (cabinMap) { cabinMap.remove(); }
+
+    cabinMap = L.map('ife-map', {
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false
+    });
+
+    // Dark tile layer (CartoDB dark matter — free, no key needed)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(cabinMap);
+
+    // Origin marker
+    const originIcon = L.divIcon({ className: '', html: '<div style="width:10px;height:10px;background:#f0c040;border-radius:50%;border:2px solid #fff;"></div>', iconSize:[10,10], iconAnchor:[5,5] });
+    const destIcon = L.divIcon({ className: '', html: '<div style="width:10px;height:10px;background:#40e060;border-radius:50%;border:2px solid #fff;"></div>', iconSize:[10,10], iconAnchor:[5,5] });
+
+    L.marker([origin.lat, origin.lon], { icon: originIcon }).addTo(cabinMap)
+      .bindTooltip(origin.code, { permanent: true, className: 'map-label', direction: 'top' });
+    L.marker([destination.lat, destination.lon], { icon: destIcon }).addTo(cabinMap)
+      .bindTooltip(destination.code, { permanent: true, className: 'map-label', direction: 'top' });
+
+    // Great circle arc using 60 interpolated points
+    const arcPoints = greatCirclePoints(origin.lat, origin.lon, destination.lat, destination.lon, 60);
+    flightArc = L.polyline(arcPoints, { color: '#f0c040', weight: 2, opacity: 0.85, dashArray: '6,4' }).addTo(cabinMap);
+
+    // Plane marker (SVG triangle pointing along heading)
+    const planeIcon = L.divIcon({ className: '', html: '<div style="font-size:18px;transform:rotate(0deg)">✈</div>', iconSize:[20,20], iconAnchor:[10,10] });
+    planeMarker = L.marker([origin.lat, origin.lon], { icon: planeIcon }).addTo(cabinMap);
+
+    // Fit map to show both airports with padding
+    cabinMap.fitBounds(L.latLngBounds([[origin.lat, origin.lon],[destination.lat, destination.lon]]), { padding: [40, 40] });
+  }
+
+  // Great circle interpolation
+  function greatCirclePoints(lat1, lon1, lat2, lon2, n) {
+    const toRad = d => d * Math.PI / 180;
+    const toDeg = r => r * 180 / Math.PI;
+    const φ1 = toRad(lat1), λ1 = toRad(lon1), φ2 = toRad(lat2), λ2 = toRad(lon2);
+    const points = [];
+    for (let i = 0; i <= n; i++) {
+      const f = i / n;
+      const A = Math.sin((1-f)*Math.PI) / Math.sin(Math.PI); // won't work — use slerp
+      // Correct slerp:
+      const d = 2*Math.asin(Math.sqrt(Math.pow(Math.sin((φ2-φ1)/2),2)+Math.cos(φ1)*Math.cos(φ2)*Math.pow(Math.sin((λ2-λ1)/2),2)));
+      if (d === 0) { points.push([lat1, lon1]); continue; }
+      const a = Math.sin((1-f)*d)/Math.sin(d);
+      const b = Math.sin(f*d)/Math.sin(d);
+      const x = a*Math.cos(φ1)*Math.cos(λ1) + b*Math.cos(φ2)*Math.cos(λ2);
+      const y = a*Math.cos(φ1)*Math.sin(λ1) + b*Math.cos(φ2)*Math.sin(λ2);
+      const z = a*Math.sin(φ1) + b*Math.sin(φ2);
+      points.push([toDeg(Math.atan2(z, Math.sqrt(x*x+y*y))), toDeg(Math.atan2(y, x))]);
+    }
+    return points;
+  }
+
+  // Call this every frame from the requestAnimationFrame loop to update plane position:
+  function updatePlanePosition(progress) { // progress = 0.0 to 1.0
+    if (!planeMarker || !cabinMap) return;
+    const arcPoints = flightArc.getLatLngs();
+    const idx = Math.min(Math.floor(progress * (arcPoints.length - 1)), arcPoints.length - 2);
+    const pt = arcPoints[idx];
+    planeMarker.setLatLng(pt);
+  }
+
+Add this CSS for map labels:
+  .map-label { background: transparent !important; border: none !important; color: #f0c040; font-size: 11px; font-weight: 700; font-family: 'Inter', sans-serif; box-shadow: none !important; }
+  .leaflet-container { background: #0a1628 !important; }
+
+Telemetry bar below the map (plain HTML, updated from requestAnimationFrame):
+  <div id="ife-telemetry" style="display:flex; gap:24px; padding:12px 16px; background:#080810; border-top:1px solid rgba(240,192,64,0.2); font-family:'Inter',sans-serif; font-size:12px; color:#7a7888;">
+    <span>TIME TO DEST <strong id="tel-ttd" style="color:#e8e6f0">--:--</strong></span>
+    <span>ALT <strong id="tel-alt" style="color:#e8e6f0">-- ft</strong></span>
+    <span>SPD <strong id="tel-spd" style="color:#e8e6f0">-- kts</strong></span>
+    <span>OAT <strong id="tel-oat" style="color:#e8e6f0">--°C</strong></span>
+  </div>
+
+Update telemetry values every frame from the session state. Altitude and speed should ramp smoothly:
+  // During takeoff (phase progress 0→1 over 3 min):
+  altitude = Math.floor(cruiseAltitude * Math.pow(takeoffProgress, 0.7))
+  speed = Math.floor(cruiseSpeed * Math.pow(takeoffProgress, 0.5))
+  // During cruise: altitude = cruiseAltitude, speed = cruiseSpeed
+  // During descent: mirror of takeoff ramp, reversed
+  oat = Math.round(15 - (altitude / 1000) * 1.98) // ISA lapse rate
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 3: TAIL CAM — Actual aerial footage simulation, not circles
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Delete all existing tail cam code. Rewrite from scratch.
+
+The tail cam is a canvas animation inside the IFE panel that simulates a live feed from the tail of the aircraft looking backward and down.
+
+<canvas id="tail-cam-canvas" width="640" height="400" style="width:100%;height:100%;display:block;"></canvas>
+
+Animate with requestAnimationFrame. Draw these layers in order each frame:
+
+LAYER 1 — SKY GRADIENT (top 65% of canvas):
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, 260);
+  skyGrad.addColorStop(0, '#020a1a');
+  skyGrad.addColorStop(0.6, '#0a2860');
+  skyGrad.addColorStop(1, '#1a4a80');
+  ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, 640, 260);
+
+LAYER 2 — CLOUD DECK (the key visual — realistic cloud shapes, not circles):
+  Maintain an array of 20 cloud objects. Each cloud has: { x, y, scale, speed, opacity, layers }
+  where layers is an array of 8 {dx, dy, rx, ry} ellipses that together form one cloud.
+  
+  Generate clouds on init:
+    function makeCloud(x) {
+      const baseY = 180 + Math.random() * 60; // near horizon
+      const scale = 0.5 + Math.random() * 1.5;
+      const layers = [];
+      for (let i = 0; i < 8; i++) {
+        layers.push({
+          dx: (Math.random() - 0.5) * 80,
+          dy: (Math.random() - 0.5) * 20,
+          rx: 30 + Math.random() * 60,
+          ry: 15 + Math.random() * 25
+        });
+      }
+      return { x, y: baseY, scale, speed: 0.3 + Math.random() * 0.5, opacity: 0.6 + Math.random() * 0.35, layers };
+    }
+  
+  Draw each cloud:
+    function drawCloud(ctx, cloud, t) {
+      ctx.save();
+      ctx.translate(cloud.x, cloud.y);
+      ctx.scale(cloud.scale, cloud.scale * 0.4); // flatten vertically — clouds seen from above/behind are wide and flat
+      ctx.globalAlpha = cloud.opacity;
+      cloud.layers.forEach(l => {
+        ctx.beginPath();
+        ctx.ellipse(l.dx, l.dy, l.rx, l.ry, 0, 0, Math.PI * 2);
+        // Volumetric gradient per ellipse
+        const g = ctx.createRadialGradient(l.dx, l.dy - l.ry*0.3, 0, l.dx, l.dy, l.rx);
+        g.addColorStop(0, 'rgba(255,255,255,0.95)');
+        g.addColorStop(0.4, 'rgba(220,225,235,0.7)');
+        g.addColorStop(1, 'rgba(160,170,190,0)');
+        ctx.fillStyle = g;
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+  
+  Each frame, move clouds: cloud.x -= cloud.speed; if (cloud.x < -200) { cloud.x = 700; cloud.y = 180 + Math.random() * 60; }
+  
+  The clouds should appear to rush toward and beneath the "camera" — this is the key effect. Achieve by also scaling up clouds as they approach the bottom of the cloud zone and fading them out.
+
+LAYER 3 — AIRCRAFT TAIL SILHOUETTE (bottom center):
+  Draw a simple but recognizable aircraft tail shape using canvas paths — centered at bottom of canvas.
+  ctx.save();
+  ctx.translate(320, 400);
+  ctx.fillStyle = '#1a1a24';
+  ctx.strokeStyle = '#2a2a38';
+  ctx.lineWidth = 1;
+  // Tail fin (vertical stabilizer)
+  ctx.beginPath();
+  ctx.moveTo(0, -80); ctx.lineTo(-15, 0); ctx.lineTo(15, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Horizontal stabilizers
+  ctx.beginPath();
+  ctx.moveTo(-80, -20); ctx.lineTo(-10, -30); ctx.lineTo(-10, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(80, -20); ctx.lineTo(10, -30); ctx.lineTo(10, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Fuselage (top portion visible above camera view)
+  ctx.beginPath();
+  ctx.ellipse(0, -10, 18, 60, 0, 0, Math.PI); ctx.fill(); ctx.stroke();
+  ctx.restore();
+
+LAYER 4 — SCANLINE OVERLAY for camera realism:
+  for (let y = 0; y < 400; y += 4) {
+    ctx.fillStyle = 'rgba(0,0,0,0.08)';
+    ctx.fillRect(0, y, 640, 2);
+  }
+
+LAYER 5 — HUD OVERLAY (drawn on canvas, not HTML):
+  ctx.font = 'bold 11px Inter, monospace';
+  ctx.fillStyle = '#40ff80';
+  ctx.fillText('● REC', 16, 24);
+  ctx.fillStyle = 'rgba(64,255,128,0.6)';
+  ctx.fillText(new Date().toISOString().substr(11,8), 16, 40);
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '10px Inter, monospace';
+  ctx.fillText('TAIL CAM · ALT ' + currentAltitude.toLocaleString() + ' FT', 16, 56);
+  // Blinking REC dot — only draw the circle every other second
+  if (Math.floor(Date.now() / 500) % 2 === 0) {
+    ctx.beginPath(); ctx.arc(8, 20, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#ff3030'; ctx.fill();
+  }
+
+LAYER 6 — VIGNETTE (dark edges for screen feel):
+  const vig = ctx.createRadialGradient(320, 200, 100, 320, 200, 380);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,0,0,0.65)');
+  ctx.fillStyle = vig; ctx.fillRect(0, 0, 640, 400);
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FIX 4: THE ENTIRE IFE PANEL must look like real airline software, not a web app
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The IFE panel is currently styled like a generic HTML card. Restyle it completely.
+
+The IFE overlay panel (#ife-panel) covers the center 70% width, 85% height of the screen.
+Background: #06060e
+Border: 1px solid rgba(240,192,64,0.15)
+Border-radius: 4px (screens have almost no radius)
+No box-shadow blur — screens don't float
+Font: 'Inter' throughout, except clock which uses 'Instrument Serif'
+
+TOP BAR (airline header):
+  <div style="background:#0a0a16; border-bottom:1px solid rgba(240,192,64,0.12); padding:10px 16px; display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="color:#f0c040; font-size:13px; font-weight:700; letter-spacing:0.12em;">CABIN AIR</span>
+      <span style="color:#3a3a4a; font-size:11px;">|</span>
+      <span style="color:#7a7888; font-size:11px; letter-spacing:0.08em;" id="ife-route-label">LAX → LHR</span>
+    </div>
+    <button id="ife-close" style="background:none; border:none; color:#7a7888; font-size:20px; cursor:pointer; padding:0 4px; line-height:1;">&times;</button>
+  </div>
+
+CONTENT AREA (where map/clock/tasks/tailcam renders):
+  <div id="ife-content" style="flex:1; overflow:hidden; position:relative;"></div>
+
+BOTTOM TAB BAR:
+  <div style="background:#08080f; border-top:1px solid rgba(255,255,255,0.06); display:flex;">
+    Each tab button: flex:1; padding:12px 0; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;
+    color:#7a7888 (inactive); color:#f0c040 (active); border-top:2px solid transparent (inactive);
+    border-top:2px solid #f0c040 (active); background:none; border-left/right/bottom:none; cursor:pointer;
+    Tabs: MAP · CLOCK · TASKS · TAIL CAM
+  </div>
+
+CLOCK MODE styling:
+  Full black background (#000000). Center everything.
+  Time display: font-family 'Instrument Serif'; font-size: clamp(4rem, 12vw, 8rem); color: #ffffff; letter-spacing: -0.02em; font-weight: 400;
+  Sprint label above: font-size: 11px; letter-spacing: 0.2em; color: #f0c040; text-transform: uppercase; margin-bottom: 16px;
+  Phase label below: font-size: 12px; color: #3a3a50; letter-spacing: 0.1em;
+  When under 5 minutes remaining: add CSS animation pulsing the time display opacity 1→0.7→1 over 2s.
+
+TASKS MODE styling:
+  Background: #06060e
+  Input: width:100%; padding:12px 16px; background:#0e0e1a; border:1px solid rgba(255,255,255,0.1);
+  border-radius:0; color:#e8e6f0; font-size:13px; outline:none; font-family:'Inter';
+  placeholder: "Add a task and press Enter..."
+  On focus: border-color: rgba(240,192,64,0.4)
+  
+  Task item: display:flex; align-items:center; gap:12px; padding:11px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.04); cursor:pointer;
+  Status dot: width:8px; height:8px; border-radius:50%;
+    todo: background:#3a3a50
+    doing: background:#f0c040
+    done: background:#40e060
+  Task text: font-size:13px; color:#e8e6f0 (todo/doing) or #3a3a50 with text-decoration:line-through (done)
+  Sprint badge right-aligned: font-size:10px; color:#3a3a50; letter-spacing:0.08em
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VERIFICATION — do not submit until all pass
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[ ] Open CLOCK tab: timer counts down visibly in real time, second by second
+[ ] Open MAP tab: real CartoDB dark map tiles load, airports shown as dots, great-circle arc drawn, plane emoji moves along arc
+[ ] Telemetry bar updates: altitude/speed/time numbers change over time
+[ ] Open TAIL CAM tab: volumetric cloud shapes (not circles) drift toward camera, aircraft tail silhouette visible at bottom, REC dot blinks red
+[ ] IFE looks like airline software: dark, amber accents, no generic web-app styling
+[ ] Add tasks in TASKS tab: input works, tasks appear, click to cycle status

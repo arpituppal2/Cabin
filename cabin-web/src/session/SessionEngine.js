@@ -12,37 +12,36 @@ export const PHASES = {
   ARRIVED: 'ARRIVED'
 };
 
-const BOARDING_MIN = 5;
-const TAKEOFF_MIN = 3;
-const DESCENT_MIN = 15;
-const LANDING_MIN = 5;
+const BOARDING_MS  = 5  * 60 * 1000;
+const TAKEOFF_MS   = 3  * 60 * 1000;
+const DESCENT_MS   = 15 * 60 * 1000;
+const LANDING_MS   = 5  * 60 * 1000;
 
 export class SessionEngine {
   constructor() {
     this.state = {
       phase: PHASES.ONBOARDING,
       route: ROUTES[0],
-      sessionStartTime: null,
-      elapsedSeconds: 0,
-      phaseStartSeconds: 0,
+      elapsedMs: 0,
+      phaseStartMs: 0,
+      sprintDurationMs: 25 * 60 * 1000,
+      breakDurationMs:  5  * 60 * 1000,
+      taxiDurationMs:   8  * 60 * 1000,
+      sprintMsLeft: 25 * 60 * 1000,
       currentSprint: 1,
-      sprintDurationMin: 25,
-      breakDurationMin: 5,
-      taxiDurationMin: 8,
+      completedSprints: 0,
       isOnBreak: false,
       seat: '1A',
       tasks: [],
       notes: '',
-      completedSprints: 0,
       meals: [],
-      totalCruiseMin: 120,
-      sprintSecondsLeft: 0,
-      notebookOpenedThisSprint: false
+      totalCruiseMs: 120 * 60 * 1000,
     };
     this._listeners = {};
-    this._phaseTimer = null;
-    this._tickInterval = null;
-    this._lastTick = null;
+    this._rafId = null;
+    this._lastTimestamp = null;
+    this._phaseTimers = [];
+    this._stopped = false;
   }
 
   on(event, fn) {
@@ -56,77 +55,98 @@ export class SessionEngine {
   }
 
   configure(config) {
+    const spMin  = config.sprintDurationMin  || 25;
+    const brMin  = config.breakDurationMin   || 5;
+    const taxMin = config.taxiDurationMin    || 8;
+    const totMin = config.totalCruiseMin     || config.route?.flightTimeMin || 120;
+
     Object.assign(this.state, {
       seat: config.seat || '1A',
       route: config.route || ROUTES[0],
-      totalCruiseMin: config.totalCruiseMin || config.route?.flightTimeMin || 120,
-      sprintDurationMin: config.sprintDurationMin || 25,
-      breakDurationMin: config.breakDurationMin || 5,
-      taxiDurationMin: config.taxiDurationMin || 8
+      totalCruiseMs:    totMin * 60 * 1000,
+      sprintDurationMs: spMin  * 60 * 1000,
+      breakDurationMs:  brMin  * 60 * 1000,
+      taxiDurationMs:   taxMin * 60 * 1000,
+      sprintMsLeft:     spMin  * 60 * 1000,
+      sprintSecondsLeft: spMin * 60,
+      sprintDurationMin: spMin,
+      breakDurationMin:  brMin,
+      taxiDurationMin:   taxMin,
+      elapsedSeconds:    0,
     });
-    this.state.sprintSecondsLeft = this.state.sprintDurationMin * 60;
   }
 
   start() {
-    this.state.phase = PHASES.BOARDING;
-    this.state.sessionStartTime = Date.now();
-    this.state.elapsedSeconds = 0;
-    this.state.phaseStartSeconds = 0;
-    this._startTick();
-    this.emit('phaseChange', { phase: PHASES.BOARDING });
-    this._schedulePhase(BOARDING_MIN * 60, () => this._enterTaxi());
-  }
-
-  _startTick() {
-    this._lastTick = Date.now();
-    this._tickInterval = setInterval(() => {
-      const now = Date.now();
-      const delta = (now - this._lastTick) / 1000;
-      this._lastTick = now;
-      this.state.elapsedSeconds += delta;
-      this._onTick(delta);
-    }, 250);
-  }
-
-  _onTick(delta) {
     const s = this.state;
-    if (s.phase === PHASES.CRUISE) {
-      s.sprintSecondsLeft = Math.max(0, s.sprintSecondsLeft - delta);
-      if (s.sprintSecondsLeft <= 0 && !s.isOnBreak) {
+    s.phase       = PHASES.BOARDING;
+    s.elapsedMs   = 0;
+    s.phaseStartMs = 0;
+    this._stopped = false;
+    this.emit('phaseChange', { phase: PHASES.BOARDING });
+
+    this._schedulePhase(BOARDING_MS, () => this._enterTaxi());
+    this._startRAF();
+  }
+
+  _startRAF() {
+    this._lastTimestamp = null;
+    const tick = (timestamp) => {
+      if (this._stopped) return;
+      let deltaMs = 0;
+      if (this._lastTimestamp !== null) {
+        deltaMs = Math.min(timestamp - this._lastTimestamp, 200);
+      }
+      this._lastTimestamp = timestamp;
+      this.state.elapsedMs += deltaMs;
+      this._onTick(deltaMs);
+      this._rafId = requestAnimationFrame(tick);
+    };
+    this._rafId = requestAnimationFrame(tick);
+  }
+
+  _onTick(deltaMs) {
+    const s = this.state;
+    if ((s.phase === PHASES.CRUISE || s.phase === PHASES.BREAK) && !s.isOnBreak) {
+      s.sprintMsLeft = Math.max(0, s.sprintMsLeft - deltaMs);
+      if (s.sprintMsLeft <= 0) {
         this._enterBreak();
       }
     }
+    s.sprintSecondsLeft = s.sprintMsLeft / 1000;
+    s.elapsedSeconds    = s.elapsedMs / 1000;
+    this._updateTelemetry();
     this.emit('tick', {
+      elapsedMs: s.elapsedMs,
       elapsedSeconds: s.elapsedSeconds,
       phase: s.phase,
+      sprintMsLeft: s.sprintMsLeft,
       sprintSecondsLeft: s.sprintSecondsLeft,
       currentSprint: s.currentSprint
     });
-    this._updateTelemetry();
   }
 
-  _schedulePhase(seconds, fn) {
-    if (this._phaseTimer) clearTimeout(this._phaseTimer);
-    this._phaseTimer = setTimeout(fn, seconds * 1000);
+  _schedulePhase(ms, fn) {
+    const id = setTimeout(fn, ms);
+    this._phaseTimers.push(id);
+    return id;
   }
 
   _enterTaxi() {
     this._setPhase(PHASES.TAXI);
-    this._schedulePhase(this.state.taxiDurationMin * 60, () => this._enterTakeoff());
+    this._schedulePhase(this.state.taxiDurationMs, () => this._enterTakeoff());
   }
 
   _enterTakeoff() {
     this._setPhase(PHASES.TAKEOFF);
-    this._schedulePhase(TAKEOFF_MIN * 60, () => this._enterCruise());
+    this._schedulePhase(TAKEOFF_MS, () => this._enterCruise());
   }
 
   _enterCruise() {
     this._setPhase(PHASES.CRUISE);
-    this.state.sprintSecondsLeft = this.state.sprintDurationMin * 60;
-    this.state.notebookOpenedThisSprint = false;
-    const cruiseSec = this.state.totalCruiseMin * 60;
-    this._schedulePhase(cruiseSec, () => this._enterDescent());
-    this._scheduleMeals(cruiseSec);
+    this.state.sprintMsLeft = this.state.sprintDurationMs;
+    this.state.isOnBreak = false;
+    this._schedulePhase(this.state.totalCruiseMs, () => this._enterDescent());
+    this._scheduleMeals(this.state.totalCruiseMs);
   }
 
   _enterBreak() {
@@ -138,112 +158,100 @@ export class SessionEngine {
 
   resumeFromBreak(walkOrStay) {
     if (this.state.phase !== PHASES.BREAK) return;
-    const breakSec = this.state.breakDurationMin * 60;
-    setTimeout(() => {
+    const breakMs = this.state.breakDurationMs;
+    this.emit('breakStart', { type: walkOrStay, durationSec: breakMs / 1000 });
+    this._schedulePhase(breakMs, () => {
       this.state.isOnBreak = false;
       this.state.currentSprint++;
-      this.state.sprintSecondsLeft = this.state.sprintDurationMin * 60;
-      this.state.notebookOpenedThisSprint = false;
+      this.state.sprintMsLeft = this.state.sprintDurationMs;
       this._setPhase(PHASES.CRUISE);
-    }, breakSec * 1000);
-    this.emit('breakStart', { type: walkOrStay, durationSec: breakSec });
+    });
   }
 
   _enterDescent() {
     this._setPhase(PHASES.DESCENT);
-    this._schedulePhase(DESCENT_MIN * 60, () => this._enterLanding());
+    this._schedulePhase(DESCENT_MS, () => this._enterLanding());
   }
 
   _enterLanding() {
     this._setPhase(PHASES.LANDING);
-    this._schedulePhase(LANDING_MIN * 60, () => this._enterArrived());
+    this._schedulePhase(LANDING_MS, () => this._enterArrived());
   }
 
   _enterArrived() {
     this._setPhase(PHASES.ARRIVED);
-    if (this._tickInterval) {
-      clearInterval(this._tickInterval);
-      this._tickInterval = null;
-    }
+    this._stopped = true;
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
   }
 
   _setPhase(phase) {
     this.state.phase = phase;
-    this.state.phaseStartSeconds = this.state.elapsedSeconds;
+    this.state.phaseStartMs = this.state.elapsedMs;
     this.emit('phaseChange', { phase });
   }
 
-  _scheduleMeals(totalCruiseSec) {
+  _scheduleMeals(totalCruiseMs) {
     const schedule = [
-      { offsetMin: 90, type: 'nuts', label: 'Mixed warm nuts & espresso' },
-      { offsetMin: 180, type: 'meal', label: 'Gourmet main course' },
-      { offsetMin: 300, type: 'snack', label: 'Mid-flight snack' },
+      { offsetMin: 90,  type: 'nuts',      label: 'Mixed warm nuts & espresso' },
+      { offsetMin: 180, type: 'meal',      label: 'Gourmet main course' },
+      { offsetMin: 300, type: 'snack',     label: 'Mid-flight snack' },
       { offsetMin: 480, type: 'breakfast', label: 'Breakfast before landing' }
     ];
     schedule.forEach(meal => {
-      const delaySec = meal.offsetMin * 60;
-      if (delaySec < totalCruiseSec) {
-        setTimeout(() => {
-          if (this.state.phase === PHASES.CRUISE) {
-            this.emit('mealService', meal);
-          }
-        }, delaySec * 1000);
+      const delayMs = meal.offsetMin * 60 * 1000;
+      if (delayMs < totalCruiseMs) {
+        this._schedulePhase(delayMs, () => {
+          if (this.state.phase === PHASES.CRUISE) this.emit('mealService', meal);
+        });
       }
     });
   }
 
   _updateTelemetry() {
     const s = this.state;
-    const phase = s.phase;
-    const elapsed = s.elapsedSeconds;
-    const boardingEnd = BOARDING_MIN * 60;
-    const taxiEnd = boardingEnd + s.taxiDurationMin * 60;
-    const takeoffEnd = taxiEnd + TAKEOFF_MIN * 60;
-    const cruiseEnd = takeoffEnd + s.totalCruiseMin * 60;
-    const descentEnd = cruiseEnd + DESCENT_MIN * 60;
-    const landingEnd = descentEnd + LANDING_MIN * 60;
+    const elapsed = s.elapsedMs;
+    const boardingEnd  = BOARDING_MS;
+    const taxiEnd      = boardingEnd  + s.taxiDurationMs;
+    const takeoffEnd   = taxiEnd      + TAKEOFF_MS;
+    const cruiseEnd    = takeoffEnd   + s.totalCruiseMs;
+    const descentEnd   = cruiseEnd    + DESCENT_MS;
 
-    let altitude = 0;
-    let speed = 0;
-    const cruise = s.route.cruiseAltitudeFt;
-    const cruiseSpd = s.route.cruiseSpeedKts;
+    const cruise    = s.route.cruiseAltitudeFt || 39000;
+    const cruiseSpd = s.route.cruiseSpeedKts   || 490;
 
-    if (phase === PHASES.BOARDING || phase === PHASES.TAXI) {
+    let altitude = 0, speed = 0;
+
+    if (s.phase === PHASES.BOARDING || s.phase === PHASES.TAXI) {
       altitude = 0; speed = 0;
-    } else if (phase === PHASES.TAKEOFF) {
-      const t = Math.min(1, (elapsed - taxiEnd) / (TAKEOFF_MIN * 60));
-      altitude = Math.pow(t, 1.5) * cruise * 0.6;
-      speed = t * cruiseSpd * 0.85;
-    } else if (phase === PHASES.CRUISE || phase === PHASES.BREAK) {
-      const t = Math.min(1, (elapsed - takeoffEnd) / (s.totalCruiseMin * 60 * 0.15));
-      altitude = cruise * 0.6 + t * cruise * 0.4;
-      speed = cruiseSpd * 0.85 + t * cruiseSpd * 0.15;
-    } else if (phase === PHASES.DESCENT) {
-      const t = Math.min(1, (elapsed - cruiseEnd) / (DESCENT_MIN * 60));
-      altitude = cruise * (1 - t * 0.95);
-      speed = cruiseSpd * (1 - t * 0.4);
-    } else if (phase === PHASES.LANDING) {
-      const t = Math.min(1, (elapsed - descentEnd) / (LANDING_MIN * 60));
-      altitude = cruise * 0.05 * (1 - t);
-      speed = cruiseSpd * 0.6 * (1 - t * 0.85);
+    } else if (s.phase === PHASES.TAKEOFF) {
+      const t = Math.min(1, (elapsed - taxiEnd) / TAKEOFF_MS);
+      altitude = Math.floor(cruise * Math.pow(t, 0.7));
+      speed    = Math.floor(cruiseSpd * Math.pow(t, 0.5));
+    } else if (s.phase === PHASES.CRUISE || s.phase === PHASES.BREAK) {
+      const t = Math.min(1, (elapsed - takeoffEnd) / (s.totalCruiseMs * 0.12));
+      altitude = Math.floor(cruise * 0.85 + cruise * 0.15 * t);
+      speed    = Math.floor(cruiseSpd * 0.9 + cruiseSpd * 0.1 * t);
+    } else if (s.phase === PHASES.DESCENT) {
+      const t = Math.min(1, (elapsed - cruiseEnd) / DESCENT_MS);
+      altitude = Math.floor(cruise * (1 - t * 0.98));
+      speed    = Math.floor(cruiseSpd * (1 - t * 0.38));
+    } else if (s.phase === PHASES.LANDING) {
+      const t = Math.min(1, (elapsed - descentEnd) / LANDING_MS);
+      altitude = Math.floor(cruise * 0.02 * (1 - t));
+      speed    = Math.floor(cruiseSpd * 0.55 * (1 - t));
     }
 
-    const totalFlight = s.route.flightTimeMin * 60;
-    const flightElapsed = Math.max(0, elapsed - boardingEnd);
-    const timeToDestSec = Math.max(0, totalFlight - flightElapsed);
-    const oat = altitude > 1000 ? -57 + (1 - altitude / cruise) * 72 : 15;
-    const progress = totalFlight > 0 ? Math.min(1, flightElapsed / totalFlight) : 0;
+    const oat = altitude > 100 ? Math.round(15 - (altitude / 1000) * 1.98) : 15;
+    const totalFlightMs  = s.route.flightTimeMin ? s.route.flightTimeMin * 60 * 1000 : 600 * 60 * 1000;
+    const flightElapsedMs = Math.max(0, elapsed - boardingEnd);
+    const timeToDestSec  = Math.max(0, Math.round((totalFlightMs - flightElapsedMs) / 1000));
+    const progress       = totalFlightMs > 0 ? Math.min(1, flightElapsedMs / totalFlightMs) : 0;
 
     this.emit('telemetry', { altitude, speed, timeToDestSec, oat, progress });
   }
 
   addTask(text) {
-    const task = {
-      id: Date.now(),
-      text,
-      status: 'todo',
-      sprint: this.state.currentSprint
-    };
+    const task = { id: Date.now(), text, status: 'todo', sprint: this.state.currentSprint };
     this.state.tasks.push(task);
     this.emit('tasksChanged', this.state.tasks);
     return task;
@@ -252,37 +260,40 @@ export class SessionEngine {
   cycleTaskStatus(id) {
     const task = this.state.tasks.find(t => t.id === id);
     if (!task) return;
-    const cycle = { todo: 'doing', doing: 'done', done: 'todo' };
-    task.status = cycle[task.status];
+    task.status = { todo: 'doing', doing: 'done', done: 'todo' }[task.status];
     this.emit('tasksChanged', this.state.tasks);
   }
 
-  updateNotes(text) {
-    this.state.notes = text;
-  }
+  updateNotes(text) { this.state.notes = text; }
 
   reset() {
-    if (this._tickInterval) clearInterval(this._tickInterval);
-    if (this._phaseTimer) clearTimeout(this._phaseTimer);
+    this._stopped = true;
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+    this._phaseTimers.forEach(id => clearTimeout(id));
+    this._phaseTimers = [];
+    const spMin = 25, brMin = 5;
     this.state = {
       phase: PHASES.ONBOARDING,
       route: ROUTES[0],
-      sessionStartTime: null,
+      elapsedMs: 0,
       elapsedSeconds: 0,
-      phaseStartSeconds: 0,
+      phaseStartMs: 0,
+      sprintDurationMs: spMin * 60 * 1000,
+      breakDurationMs:  brMin * 60 * 1000,
+      taxiDurationMs:   8 * 60 * 1000,
+      sprintMsLeft:     spMin * 60 * 1000,
+      sprintSecondsLeft: spMin * 60,
+      sprintDurationMin: spMin,
+      breakDurationMin:  brMin,
+      taxiDurationMin:   8,
       currentSprint: 1,
-      sprintDurationMin: 25,
-      breakDurationMin: 5,
-      taxiDurationMin: 8,
+      completedSprints: 0,
       isOnBreak: false,
       seat: '1A',
       tasks: [],
       notes: '',
-      completedSprints: 0,
       meals: [],
-      totalCruiseMin: 120,
-      sprintSecondsLeft: 0,
-      notebookOpenedThisSprint: false
+      totalCruiseMs: 120 * 60 * 1000,
     };
   }
 }
