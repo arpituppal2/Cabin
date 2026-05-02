@@ -1,52 +1,78 @@
-# Cabin
+# CABIN — Immersive Productivity App
 
-A macOS/iPadOS immersive productivity app — a first-person, gate-to-gate, diegetic productivity timer built around a photorealistic business-class aircraft cabin environment.
+A browser-first, first-person productivity environment styled as a long-haul business class aircraft cabin. Built for the Replit Buildathon (Replit's 10th birthday).
 
-## Project Overview
+## What It Is
 
-Cabin is a native Apple platform application. It is **not a web app** and cannot be built or run in a Linux/Replit environment. This repository is intended for development on a macOS machine with Xcode and Unreal Engine installed.
+Cabin is a fully diegetic productivity app — no traditional UI. Every interaction happens by clicking physical objects inside a photorealistic 3D aircraft cabin rendered in Three.js/WebGL. The IFE screen IS the dashboard. The notebook IS the note editor. The engine hum IS the focus timer. Sessions run gate-to-gate with full Pomodoro sprint management.
 
-## Architecture
+## Tech Stack
 
-The project has three components:
+- **Frontend**: Pure HTML + CSS + JavaScript (ES modules, zero build steps)
+- **3D Engine**: Three.js r183 via CDN importmap
+- **Audio**: Web Audio API (synthesized, no external audio files)
+- **Fonts**: Instrument Serif + Inter (Google Fonts)
+- **Server**: Python `http.server` on port 5000
 
-- **CabinApp/** — SwiftUI application target (iPadOS 17+ / macOS 14+)
-  - SessionEngine, IFEView, MetalBridge, AudioController, GestureRouter
-- **CabinEngine/** — Unreal Engine 5.7 project
-  - CabinPawn, CabinPlayerController, CabinSessionManager, CabinGameMode
-  - Lumen GI, Nanite, Niagara particles, Sequencer
-- **CabinBridge/** — UE5 plugin bridging Metal textures from Swift to UE
-  - IFETextureUpdater, SwiftBridgeInterface
+## File Structure
 
-## Build Requirements
+```
+cabin-web/
+├── index.html              ← Entry point, importmap, font links
+├── src/
+│   ├── main.js             ← App bootstrap, wires all modules
+│   ├── scene/
+│   │   ├── CabinScene.js   ← Three.js scene, camera, renderer, lighting
+│   │   ├── CabinGeometry.js ← All 3D mesh construction (procedural, no GLBs)
+│   │   ├── WindowView.js   ← Procedural sky/cloud canvas texture
+│   │   ├── Hotspots.js     ← Raycaster click detection
+│   │   └── CameraRig.js    ← First-person look pan (mouse/touch/gyro)
+│   ├── session/
+│   │   ├── SessionEngine.js ← Flight phases, timer, Pomodoro logic
+│   │   ├── RouteData.js    ← 20 real long-haul routes database
+│   │   └── MealService.js  ← Scheduled meal fade-in events
+│   ├── audio/
+│   │   └── AudioEngine.js  ← Web Audio: engine hum, chimes, PA (speech synthesis)
+│   ├── ui/
+│   │   ├── IFEScreen.js    ← Diegetic IFE overlay (map/clock/tailcam/tasks modes)
+│   │   ├── Notebook.js     ← In-world note editor panel
+│   │   ├── SeatSelector.js ← Onboarding seat selection + config screen
+│   │   └── PanelManager.js ← Panel transitions manager
+│   └── style/
+│       ├── base.css        ← CSS tokens, reset, typography
+│       └── panels.css      ← IFE, notebook, seat selector styles
+```
 
-- macOS 26+ (Apple Silicon recommended — M4 Max target)
-- Xcode 26.4+ with iPadOS 26 SDK
-- Unreal Engine 5.7.4 installed via Epic Games Launcher
-- Swift 6.0 (strict concurrency enabled)
+## Running
 
-## Setup
+The app is served as static files by Python's http.server on port 5000.
 
-Run `bash setup.sh` on a qualifying macOS machine. This will:
-1. Verify Xcode and UE5 installations
-2. Symlink the CabinBridge plugin into the UE project
-3. Generate UE5 project files
-4. Open the Xcode project
+```bash
+python3 -m http.server 5000 --directory cabin-web
+```
 
-## Documentation
+## Flight Phases
 
-- `docs/ARCHITECTURE.md` — Full system architecture and layer diagram
-- `docs/DESIGN_SPEC.md` — Visual and experience design specification
-- `docs/UE5_SETUP.md` — Unreal Engine setup steps
-- `docs/XCODE_SETUP.md` — Xcode signing and build steps
+1. **ONBOARDING** — Seat selector + route/session config
+2. **BOARDING** — Jet bridge, bright cabin lights, PA announcement
+3. **TAXI** — Tarmac view, blue-purple lighting, seatbelt sign ON
+4. **TAKEOFF** — Engine spool-up, camera tilts +12°, ground rushes away
+5. **CRUISE** — Main work session, Pomodoro sprints, dynamic sky
+6. **BREAK** — Walk to galley or stay seated (tea service)
+7. **DESCENT** — Cabin brightens, approach PA, seatbelt sign ON
+8. **LANDING** — Gear-down sounds, heavy camera shake
+9. **ARRIVED** — Session summary on IFE with stats
 
 ## Key Features
 
-- First-person business-class cabin simulation
-- Gate-to-gate Pomodoro session structure (7 flight phases)
-- Diegetic IFE screen with 3 modes: Flight Map, Big Clock, Tail Camera
-- Metal texture bridge between SwiftUI and UE5 at 120Hz
-- Dynamic lighting, Lumen GI, Nanite geometry
-- Spatial audio via Unreal Audio Engine with convolution reverb
-- iPad gyroscope camera control
-- iPadOS Split View support
+- First-person camera with ±60° yaw / ±30° pitch look-around
+- Procedural sky with clouds, stars, ground, tarmac based on phase
+- All geometry built procedurally (no external 3D assets)
+- PBR materials: marble console, walnut tray table, charcoal seat shell
+- Clickable hotspots: IFE, tray table, notebook, seat controls, cubby, headphones
+- Web Audio synthesized engine hum, chimes, clicks, PA announcements
+- IFE modes: Flight Map (live telemetry), Big Clock, Tail Camera, Task Board
+- Notebook with ruled paper styling and auto-timestamped sprint headers
+- 20 real long-haul routes with realistic altitude/speed telemetry
+- Meal service events at configurable intervals during cruise
+- Mobile/touch responsive with pointer event support

@@ -1,0 +1,480 @@
+You are building CABIN — a fully immersive, browser-first, first-person productivity app that runs entirely in the browser on Replit. This is an entry for the Replit Buildathon (Replit's 10th birthday). Build everything from scratch. Do not stop until the app is complete, tested, and working.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT CABIN IS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Cabin is a diegetic, first-person productivity environment styled as a long-haul business class seat. The user sits inside a photorealistic aircraft cabin rendered in Three.js/WebGL. There is no traditional UI — every productivity interaction happens by clicking on physical objects inside the cabin. The IFE screen IS the dashboard. The notebook IS the note editor. The tray table IS the task surface. The engine hum IS the focus timer.
+
+The entire experience runs gate-to-gate: you board, taxi, take off, cruise (this is deep work time), land, and arrive. Session length = flight time. Pomodoro sprints = flight legs.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TECH STACK (mandatory)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Pure browser app: HTML + CSS + JavaScript (ES modules)
+- Three.js r183 via CDN importmap for the 3D cabin scene
+- Web Audio API for all sound (engine hum, chimes, service clinks, PA announcements synthesized via oscillators and convolution)
+- No backend required. No localStorage. All state is in-memory.
+- Single HTML entry point: index.html
+- Must work on Replit's static hosting with zero build steps
+- Must be mobile/tablet responsive (pointer events + touch events for look-around and interaction)
+
+CDN importmap (use exactly this):
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+  }
+}
+</script>
+
+Fonts: Use 'Instrument Serif' (Google Fonts) for display, 'Inter' (Google Fonts) for body/HUD.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FILE STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cabin-web/
+├── index.html              ← entry point, importmap, font links
+├── src/
+│   ├── main.js             ← boots app, wires modules
+│   ├── scene/
+│   │   ├── CabinScene.js   ← Three.js scene, camera, renderer, lighting
+│   │   ├── CabinGeometry.js ← all 3D mesh construction (seat, IFE, console, tray, overhead, window)
+│   │   ├── WindowView.js   ← procedural sky + cloud layers + phase-driven lighting
+│   │   ├── Hotspots.js     ← raycaster click detection on cabin objects
+│   │   └── CameraRig.js    ← first-person look pan (mouse drag + touch + gyroscope)
+│   ├── session/
+│   │   ├── SessionEngine.js ← flight phases, timer, pomodoro, break logic
+│   │   ├── RouteData.js    ← airport database, route telemetry (realistic altitude, speed, time)
+│   │   └── MealService.js  ← scheduled meal/drink fade-in events
+│   ├── audio/
+│   │   └── AudioEngine.js  ← Web Audio API: engine hum, chimes, PA, service sounds
+│   ├── ui/
+│   │   ├── IFEScreen.js    ← diegetic IFE overlay (map mode, clock mode, tail cam mode, task mode)
+│   │   ├── Notebook.js     ← in-world note editor panel
+│   │   ├── TaskBoard.js    ← task creation, completion, sprint assignment
+│   │   ├── SeatSelector.js ← onboarding seat selection screen (1-2-1 layout visual)
+│   │   └── PanelManager.js ← manages which overlay panel is open, transitions
+│   └── style/
+│       ├── base.css        ← reset, tokens, typography
+│       └── panels.css      ← IFE, notebook, task board panel styles
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+THE 3D CABIN SCENE (CabinScene.js + CabinGeometry.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Build a first-person business class seat in Three.js. The camera represents the user's eyes, seated in the chair. The user can pan by dragging (mouse) or swiping (touch). Pan range: ±60° horizontal, ±30° vertical from center. No full rotation.
+
+MATERIALS (use MeshStandardMaterial throughout, PBR):
+- Seat shell: deep charcoal (#1a1a20), slight roughness 0.7, metalness 0.1
+- Walnut tray table: warm brown (#6b4226), roughness 0.8, metalness 0.0, faint wood grain (use procedural UV noise)
+- Faux marble console: off-white (#d4cfc8) with subtle grey vein lines (use canvas texture), roughness 0.3, metalness 0.05
+- IFE bezel: matte black (#0d0d0f), roughness 0.9
+- IFE screen: emissive panel (emissive color driven by current mode)
+- Overhead bin plastic: cool grey (#b0adb8), roughness 0.6
+- Carpet aisle: deep navy/charcoal pattern (#1e1e2a), roughness 1.0
+- Window frame: brushed aluminum (#8a8a9a), metalness 0.7, roughness 0.4
+- Duvet: quilted charcoal (#2a2a30) on ottoman (bottom of scene, partially visible)
+- Amenity kit: small cream pouch (#e8e0d5) on the side console
+
+GEOMETRY (build procedurally, no external GLB files):
+- Seat shell: BoxGeometry + CylinderGeometry headrest, seat pan, armrests
+- Tray table: BoxGeometry, hinged at the bottom of the IFE column. Stowed = flat against column. Deployed = horizontal, sliding out with animation.
+- IFE: Large BoxGeometry panel, 16:10 aspect ratio. Screen face = PlaneGeometry with emissive material.
+- Side console: BoxGeometry with slight bevel (use EdgesGeometry for visual crispness), faux marble material
+- Capacitive buttons on console: small CylinderGeometry discs (4 total: Upright, Lounge, Bed, Lumbar)
+- Storage cubby: BoxGeometry with a sliding door (AnimationMixer or manual lerp). Inside: a small cylinder for Evian bottle (light blue #c8e6f5), a hook with headphone silhouette (torus + cylinders).
+- Overhead bin: large curved BoxGeometry above camera. Include gasper (air vent): small CylinderGeometry. Seatbelt sign: PlaneGeometry with canvas texture showing orange LED glow when active.
+- Window: to the left of the seat (or right, depending on seat selection). Frame = BoxGeometry border. Window glass = PlaneGeometry with transparency + WindowView sky texture applied.
+- Aisle: extends right (or left) of the seat. Floor is visible. Far end fades into darkness.
+
+LIGHTING:
+- DirectionalLight (main): warm white (#fff5e0), intensity driven by flight phase (boarding=1.2 cool white, taxi=0.9 blue-purple, cruise=0.6 warm, descent=1.0 warm orange, landing=1.2 back to white)
+- AmbientLight: low intensity (0.3), matches phase color
+- PointLight inside cubby: soft warm (#ffe4a0), intensity 0.4 (simulates cubby backlight)
+- IFE screen emissive light: PointLight in front of IFE, color = current IFE mode color, low intensity 0.2
+- Window bounce: subtle HemisphereLight (sky=current sky color, ground=#1a1a20, intensity 0.15)
+
+Animate lighting transitions between phases with smooth lerping (2-second transitions).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+THE WINDOW VIEW (WindowView.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The window shows a procedurally animated sky. No video files needed (Replit-friendly).
+
+Implement using a layered canvas texture on the window PlaneGeometry, updated each frame:
+- Sky gradient: lerps based on time of day + flight phase
+  - Boarding (dawn): deep navy → violet → orange horizon
+  - Taxi: brightening blue
+  - Cruise (day): deep blue (#0a2a6e) → cyan (#87ceeb) gradient
+  - Cruise (golden hour): amber → rose → deep purple
+  - Cruise (night): near-black (#050510) → dark blue with star field (random dots)
+  - Descent: orangey blue, ground starting to appear at bottom
+  - Landing: ground visible (brown/green patches), airport lights if night
+- Cloud layer: procedural noise clouds drawn on canvas (layered semi-transparent white ellipses animated by wind offset). Parallax effect: pan slightly when user looks left/right.
+- Subtle window reflections: draw a faint ghost of the IFE screen on the window glass (low opacity).
+- Occasional turbulence: random small camera shake (position += sin(time * freq) * 0.002) during cruise.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOTSPOT INTERACTION (Hotspots.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use THREE.Raycaster on click/tap to detect which cabin object was clicked.
+
+Clickable objects and their actions:
+1. IFE screen → open IFEScreen panel overlay (cycles through: Map → Clock → Task Board → Tail Cam → back to Map)
+2. Tray table (stowed) → animate deploy: lerp from vertical to horizontal position over 0.4s, play "clunk" sound
+3. Tray table (deployed) → open TaskBoard panel (tray is your work surface)
+4. Notebook on tray table → open Notebook editor panel
+5. Console seat buttons (4 discs) → animate seat position (recline angle changes slightly for visual feedback), play soft click sound
+6. Cubby door → slide open, animate door, reveal Evian + headphones
+7. Headphones in cubby → toggle audio engine on/off
+8. Evian bottle → play soft pour/drinking sound, subtle animation
+9. Seatbelt sign → no action (display only, turns on/off with phase)
+10. Gasper (air vent) → play soft hiss sound on click
+
+Hover feedback: when the mouse hovers over a clickable object, apply a faint emissive highlight (emissiveIntensity: 0.15) and change cursor to pointer. On mouse-out, reset.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+THE CAMERA RIG (CameraRig.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+First-person camera, no movement (user is seated). Only rotation/pan.
+
+Controls:
+- Mouse drag (pointerdown + pointermove): rotate camera yaw (left/right ±60°) and pitch (up/down ±30°)
+- Touch drag: same on mobile
+- DeviceOrientationEvent (gyroscope on mobile if permitted): optional, add permission request button
+- Smooth lerp: camera rotation lerps toward target at speed 0.08 each frame
+- Auto-center: after 8 seconds of no interaction, slowly lerp back to center (0°,0°)
+
+Takeoff tilt: during takeoff phase, lerp camera pitch to +12° over 30 seconds, then lerp back to 0° once cruising.
+Break walk: during break phase, animate camera along a pre-defined spline path down the aisle (3 steps forward, pause, 3 steps back) over 20 seconds.
+Turbulence shake: small random offsets (max ±0.5°) applied via noise function during cruise phase.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+THE SESSION ENGINE (SessionEngine.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The session is the core game loop. All phases are driven by a real JavaScript timer.
+
+FLIGHT PHASES:
+1. ONBOARDING: Seat selection + route selection. No timer yet. User configures session.
+2. BOARDING (5 min fixed): Jet bridge visible, bright cabin lights, boarding music-style audio ambience.
+3. TAXI (user-configurable 5-15 min): Tarmac view, cabin dims to moody blue-purple. Seatbelt sign ON.
+4. TAKEOFF (3 min fixed): Engine spool-up audio, camera tilts upward, ground rushes away.
+5. CRUISE (user's deep work time, configurable 30 min to 8 hours): Main session. Pomodoro cycles run here.
+6. DESCENT (15 min fixed): Cabin brightens, IFE map shows approach, "prepare for arrival" PA.
+7. LANDING (5 min fixed): Gear-down sound, ground rush, final deceleration.
+8. ARRIVED: Session complete screen on IFE. Stats shown.
+
+POMODORO INSIDE CRUISE:
+- Sprint duration: configurable (default 25 min)
+- Break duration: configurable (default 5 min)
+- During sprint: Big Clock mode auto-activates on IFE. Engine hum steady.
+- At sprint end: chime plays, break animation triggers (stand and walk OR tea fades onto tray).
+- After break: new sprint begins automatically.
+
+STATE OBJECT (in-memory):
+{
+  phase: 'BOARDING' | 'TAXI' | 'TAKEOFF' | 'CRUISE' | 'DESCENT' | 'LANDING' | 'ARRIVED',
+  route: { origin: 'LAX', destination: 'LHR', totalMinutes: 600, distance: 5456 },
+  sessionStartTime: Date,
+  elapsedMinutes: 0,
+  currentSprint: 1,
+  sprintDurationMin: 25,
+  breakDurationMin: 5,
+  isOnBreak: false,
+  seat: '1A', // selected seat
+  tasks: [],  // { id, text, status: 'todo'|'doing'|'done', sprint: number }
+  notes: '',  // raw text content of notebook
+  completedSprints: 0,
+  meals: []   // scheduled meal events
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ROUTE DATA (RouteData.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Provide a hardcoded database of 20 real long-haul routes with realistic data:
+- origin, destination, airportNameOrigin, airportNameDestination, distanceNm, flightTimeMin, cruiseAltitudeFt, cruiseSpeedKts, timezone offsets
+- Example routes include: LAX-LHR, JFK-NRT, SFO-SIN, LAX-SYD, ORD-DXB, MIA-GRU, etc.
+
+The IFE Flight Map draws a great-circle arc from origin to destination on a simple 2D Mercator canvas. The plane icon moves along the arc in real time proportional to elapsed session time.
+
+Display realistic telemetry on the IFE map:
+- "Time to Destination": countdown from flight time minus elapsed time (formatted HH:MM)
+- "Altitude": 0 ft (boarding/taxi) → ramps up to cruise altitude during takeoff → cruise altitude during cruise → descends during descent → 0 ft on landing
+- "Ground Speed": 0 kts → ramps up during takeoff → cruise speed → slows on descent → 0 on landing
+- "Outside Temperature": -57°C at cruise altitude, +15°C on ground
+- All values should be REALISTIC and smoothly animated.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AUDIO ENGINE (AudioEngine.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All audio via Web Audio API (no audio files, synthesized or tone-generated). AudioContext must start on first user gesture.
+
+Sounds to implement:
+1. Engine hum: continuous OscillatorNode (sawtooth wave ~90Hz + ~180Hz), gain driven by phase (0 during boarding, ramps to max during cruise, fades on landing). Add BiquadFilterNode (lowpass ~400Hz) for that muffled cabin sound.
+2. Engine spool-up: during takeoff, frequency ramp from 60Hz → 150Hz over 20 seconds.
+3. Seatbelt chime: two-tone pleasant chime (sine waves, 880Hz + 1108Hz, 0.3s each, fading out). Plays when seatbelt sign toggles.
+4. Tray table clunk: short noise burst (BufferSourceNode with random noise, bandpass filtered ~200-800Hz, 0.15s). Plays on deploy/stow.
+5. Button click: soft click (noise burst, 5ms, high frequency).
+6. Cubby slide: smooth noise whoosh (filtered noise, 0.3s).
+7. Meal service clink: high-pitched tink (sine, 1200Hz, 0.1s decay).
+8. PA announcement: use SpeechSynthesisUtterance (Web Speech API) for text-to-speech announcements:
+   - Boarding: "Ladies and gentlemen, welcome aboard. Flight attendants, doors to automatic and crosscheck."
+   - Takeoff: "Cabin crew, please prepare for takeoff."
+   - Cruise: "Ladies and gentlemen, the captain has turned off the fasten seatbelt sign. You are free to move about the cabin."
+   - Descent: "Ladies and gentlemen, we are beginning our descent. Please return to your seats and fasten your seatbelts."
+   - Landing: "Flight attendants, prepare for arrival."
+9. Walking sounds: during break aisle walk, subtle footstep rhythm (noise bursts every 0.5s).
+10. Galley ambience: during break, soft low-volume chatter (filtered noise with slow amplitude modulation).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+THE IFE SCREEN (IFEScreen.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The IFE is a full HTML overlay panel that appears on top of the Three.js canvas when the user clicks the IFE screen object. It looks like in-flight entertainment software — dark UI, airline aesthetic. It is NOT a generic web app panel.
+
+The IFE has four modes, accessible by tapping the mode switcher at the bottom:
+
+MODE 1 — FLIGHT MAP (default during cruise)
+- 2D canvas drawing of a world map (simplified Mercator, draw as filled dark blue polygons for continents)
+- Great-circle arc from origin to destination drawn in bright amber
+- Plane icon (SVG triangle) moves along the arc in real time
+- Bottom telemetry bar: "Time to Destination: 02:41" | "Altitude: 36,000 ft" | "Ground Speed: 542 kts" | "OAT: -57°C"
+- Route info top: "LAX → LHR | Flight CA 001 | Today"
+
+MODE 2 — BIG CLOCK (during sprint)
+- Full-screen near-black with large white countdown in the center
+- Font: Instrument Serif, massive (clamp(4rem, 15vw, 10rem))
+- Current sprint label: "SPRINT 3 OF 8" in small tracking text above
+- Subtle pulse animation on the numbers when under 5 minutes
+
+MODE 3 — TAIL CAMERA
+- CSS animated "live feed" — dark grey canvas with procedural cloud animation (same WindowView cloud logic, but from below, scrolling faster)
+- "TAIL CAM" label in top-left with a blinking red REC dot
+- Slight scanline CSS overlay (repeating horizontal stripes at 2px, 5% opacity) for that camera feel
+- Aircraft tail silhouette visible in bottom-center (simple SVG path)
+
+MODE 4 — TASKS (click tray table to access, or navigate from IFE)
+- A clean to-do list in the IFE skin
+- Input at top: type a task + press Enter to add
+- Each task shows: text, status dot (grey=todo, amber=doing, green=done), sprint assignment
+- Tap a task to cycle status: todo → doing → done
+- "SPRINT X" header groups tasks by which sprint they belong to
+- Task count badge updates in real time
+
+The IFE close button (×) in top-right corner dismisses the overlay and returns focus to the 3D scene.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTEBOOK (Notebook.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Opens when user clicks the notebook object on the tray table (the notebook appears on the tray when it is deployed).
+
+Styling: looks like an actual open notebook — cream/ivory background (#f5f0e8), faint ruled lines (repeating-linear-gradient), left red margin line, top binding visible, serif font.
+
+Features:
+- contenteditable div with auto-save to session state (in-memory notes string)
+- Timestamp auto-inserts when notebook first opens each sprint: "Sprint 3 — [time]"
+- Character count bottom-right
+- Close button returns to cabin view
+- Faint paper texture overlay (CSS noise filter)
+- Smooth open/close animation (scale + opacity from notebook's position on the tray table)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEAT SELECTOR (SeatSelector.js) — ONBOARDING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+First screen the user sees before the cabin loads.
+
+Show a top-down 2D SVG diagram of a 1-2-1 business class cabin (3 rows visible). The layout is staggered: in odd rows, solo seats are on the window sides; in even rows, the solo seats are aisle-adjacent. Draw this accurately:
+
+Row 1: [1A window] ... [gap] ... [1D center-left aisle] ... [1G center-right aisle] ... [gap] ... [1L window]
+Row 2: [gap] ... [2B left aisle] ... [2D center-left center] ... [2G center-right center] ... [2J right aisle] ... [gap]
+
+Each seat is a rectangle with a slight headrest bump. Color: unselected = dark slate, selected = warm amber. On hover, highlight amber.
+
+The 8 seats (1A, 2B, 1D, 2D, 2G, 1G, 2J, 1L) are all selectable. Show a tooltip with the seat's name and character description on hover (e.g., "1A — True Left Window. Maximum privacy. Console shields you from the aisle.")
+
+Route selector below the seat map: a dropdown/select of 20 available routes. Show origin → destination with city names and flight time.
+
+Session configuration:
+- Total session time: display the route flight time (can be overridden by manual slider: 30 min to 12 hours)
+- Taxi warm-up time: slider 0–15 min (email triage / planning time)
+- Sprint length: slider 15–50 min (default 25 min)
+- Break length: slider 3–10 min (default 5 min)
+
+"BOARD FLIGHT" button at bottom. Full-screen takeover, elegant dark aesthetic, star-field or subtle cloud background animation.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MEAL SERVICE (MealService.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+At configurable intervals during cruise (default: 90 min after takeoff, then every 3 hours), a meal fades onto the tray table:
+
+- A Three.js PlaneGeometry "meal card" appears on the tray table surface with a canvas texture showing a stylized plate illustration (draw with canvas 2D API: white plate circle, food shapes, garnish, steam particles).
+- Accompanied by the meal service clink sound.
+- After 60 seconds, the meal fades away if the user hasn't "eaten" it.
+- Clicking the meal plays a subtle eating animation (plate shrinks + fades) and shows a small "Bon appétit" toast notification.
+
+Meal schedule:
+- 90 min: Mixed warm nuts + espresso
+- 3 hours: Gourmet meal (main course)
+- 5 hours: Mid-flight snack
+- 8 hours: Breakfast before landing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+THE GATE-TO-GATE EXPERIENCE (phase transitions)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE 1 — BOARDING (5 min)
+- Jet bridge visible through window (simple rectangular geometry, grey)
+- Cabin lights: bright, cool white
+- Ground crew visible (simple animated silhouette shapes through window)
+- Audio: quiet ambient hum, distant boarding music (slow LFO modulated tone), then PA announcement
+- IFE shows: welcome screen with airline logo and route info
+- User can still configure tasks during this phase
+
+PHASE 2 — TAXI (user-configured time)
+- Jet bridge animates retracting (lerp away)
+- Window: tarmac texture scrolling slowly left
+- Cabin lights: dim to moody blue-purple (lerp DirectionalLight color + intensity)
+- Seatbelt sign: turns ON (canvas texture on overhead sign updates)
+- Camera: slight side-to-side sway (simulates taxi bumps)
+- Audio: engine at low frequency, tire rumble noise
+
+PHASE 3 — TAKEOFF (3 min)
+- Window: tarmac scrolling faster, then blur as speed increases, then sky
+- Camera: pitch tilts upward +12°
+- Cabin: G-force simulation — loose items (amenity kit) shift slightly
+- Audio: engine spool-up, PA announcement, seatbelt chime
+- After 90 seconds of takeoff: transition to CRUISE phase
+
+PHASE 4 — CRUISE (session duration)
+- Window: sky view (time-of-day driven)
+- Seatbelt sign: turns OFF after 3 minutes, chime plays
+- Pomodoro cycle begins
+- Occasional turbulence (camera shake, seatbelt sign briefly flickers on)
+- Meal service events trigger on schedule
+- User does their actual work (tasks, notes, IFE timer)
+
+PHASE 5 — BREAK (every sprint end, 5 min)
+- Option A (Stand & Walk): Camera animates down aisle toward galley, 3D aisle extends forward. Galley glimpsed. After 5 min, camera walks back.
+- Option B (Stay Seated): A tea cup + saucer fades onto the tray table. Gentle steam particle animation.
+- The user chooses at the start by a small diegetic prompt on the IFE: "Stretch your legs?" [Walk to Galley] [Stay Seated]
+
+PHASE 6 — DESCENT (15 min)
+- IFE map auto-switches to approach view
+- Window: nose tilts down, ground appears (terrain texture at bottom)
+- Cabin lights: brighten back to white
+- PA: "prepare for arrival" announcement
+- Seatbelt sign: turns back ON
+- Audio: gentle engine wind-down, pressure change hiss
+
+PHASE 7 — LANDING (5 min)
+- Window: ground rush, runway approach
+- Camera shake: heavier landing shake
+- Landing gear sound (timed noise burst)
+- Reverse thrust audio (high-frequency rumble)
+- Deceleration: camera pitch slightly forward
+- Final PA: "Ladies and gentlemen, welcome to [destination]. Local time is [time]. Thank you for flying with us."
+
+PHASE 8 — ARRIVED
+- Cabin lights full white
+- Jet bridge re-extends to window
+- IFE shows session summary:
+  - Total flight time
+  - Sprints completed
+  - Tasks done / total tasks
+  - Notes written (character count)
+  - "Productivity altitude": a fun metric
+- "Deplane" button resets the app to onboarding
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEAT PERSPECTIVE SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The camera position and the visible geometry change based on seat selection:
+
+1A (True Left Window): Window is directly to the left. Aisle is behind the console to the right. Maximally private feel — console fills right side.
+2B (Left Aisle): Window is further left, partially blocked by console. Aisle is immediately to the right. More open.
+1D (Center-Left Aisle): Aisle to immediate left. Console in center between you and 2D seat. Window is far left.
+2D (Center-Left Center/"Honeymoon"): Tucked in center. Console blocks aisle. No direct window view — only overhead light.
+2G (Center-Right Center): Mirror of 2D.
+1G (Center-Right Aisle): Mirror of 1D.
+2J (Right Aisle): Mirror of 2B.
+1L (True Right Window): Mirror of 1A.
+
+Implement this as a camera position + rotation preset per seat, with the geometry arrangement changing accordingly. The window plane is repositioned left or right. The console is repositioned. The aisle appears on the correct side.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESIGN LANGUAGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CSS color tokens:
+--color-bg: #0d0d10
+--color-surface: #16161a
+--color-surface-2: #1e1e24
+--color-border: rgba(255,255,255,0.08)
+--color-text: #e8e6f0
+--color-text-muted: #7a7888
+--color-accent: #c8a96e      ← warm amber/gold (airline luxury feel)
+--color-accent-hover: #e0c080
+--color-ife-bg: #080810       ← near-black IFE background
+--color-ife-accent: #f0c040   ← bright amber for IFE highlights
+--color-map-ocean: #0a1628
+--color-map-land: #1a2a3a
+--color-map-arc: #f0c040
+--font-display: 'Instrument Serif', Georgia, serif
+--font-body: 'Inter', system-ui, sans-serif
+
+No generic web-app aesthetics. No purple gradients. No floating glassmorphism hero cards. Everything should look like it was designed by a premium airline's in-house design team.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PANEL ANIMATION SYSTEM (PanelManager.js)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+All panels (IFE overlay, Notebook, Task Board) animate open/close:
+- IFE: scales from the IFE screen's 3D position on screen → full panel size. Uses CSS transform origin matching the 3D object's projected position. Duration 0.35s, cubic-bezier(0.16, 1, 0.3, 1).
+- Notebook: slides up from bottom-center, rotates slightly from flat on tray table. Duration 0.4s.
+- Task Board: slides in from right edge of IFE screen. Duration 0.3s.
+
+Only one panel can be open at a time. Opening a new panel closes the current one first (with exit animation).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERFORMANCE & POLISH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Target 60fps. Use renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)) to cap pixel ratio.
+- Frustum culling on all objects (default Three.js behavior — keep meshes in scene only when needed).
+- All textures are canvas-generated (no external image fetches for 3D assets).
+- requestAnimationFrame loop drives both the Three.js scene and window view canvas.
+- Passive event listeners for scroll/touch to avoid jank.
+- Reduce motion: if prefers-reduced-motion, disable camera shake and break walk animation.
+- Low-power fallback: detect if frame time > 33ms (< 30fps) and reduce cloud animation complexity.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT SUCCESS LOOKS LIKE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When complete, a user should be able to:
+1. Open the app in any browser and see the Seat Selector onboarding screen.
+2. Pick seat 1A, choose LAX→LHR, set session to 2 hours, sprints to 25 min.
+3. Click "BOARD FLIGHT" — the cabin loads. They are seated at the left window. The jet bridge is visible. PA announcement plays.
+4. Boarding completes, taxi begins, lights dim to blue-purple.
+5. Takeoff: camera tilts up, engine roars, ground rushes past window.
+6. Cruise: seatbelt sign goes off. IFE shows flight map. Engine hums steadily. Sprint 1 begins. IFE switches to Big Clock.
+7. User clicks the IFE → Task mode. Types 3 tasks. Closes IFE.
+8. User deploys tray table (clicks it) — hears clunk. Clicks notebook on tray → notebook opens. Types notes.
+9. At 25 min, sprint ends, chime plays. IFE prompts: walk or stay. User chooses walk. Camera glides down aisle. Returns. Sprint 2 begins.
+10. At 2 hours: descent begins, IFE map shows approach, PA announces, lights brighten. Landing sequence plays. Session summary appears on IFE.
+
+Everything must work. Build it, test it, iterate until it works.
