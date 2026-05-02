@@ -1,31 +1,60 @@
 import * as THREE from 'three';
 
-function makeWoodTexture() {
+// ── Texture helpers ──────────────────────────────────────────────────────────
+
+function hexRGB(hex) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+function clamp255(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+
+function makePanelTex(base = '#d4d0c8') {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const ctx = c.getContext('2d');
+  const [r,g,b] = hexRGB(base);
+  ctx.fillStyle = base; ctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 14000; i++) {
+    const x = Math.random()*512, y = Math.random()*512, v = (Math.random()-0.5)*20;
+    ctx.fillStyle = `rgba(${clamp255(r+v)},${clamp255(g+v)},${clamp255(b+v)},0.055)`;
+    ctx.fillRect(x, y, 2, 2);
+  }
+  // Subtle horizontal panel lines
+  ctx.strokeStyle = `rgba(${clamp255(r-12)},${clamp255(g-12)},${clamp255(b-12)},0.08)`;
+  ctx.lineWidth = 1;
+  for (let y = 0; y < 512; y += 64) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(512,y); ctx.stroke(); }
+  return new THREE.CanvasTexture(c);
+}
+
+function makeFabricTex(base = '#181c2c') {
   const c = document.createElement('canvas'); c.width = 256; c.height = 256;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#5a3520'; ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 48; i++) {
-    const y = (i / 48) * 256;
-    ctx.beginPath(); ctx.moveTo(0, y);
-    for (let x = 0; x < 256; x += 8) ctx.lineTo(x, y + Math.sin(x * 0.05 + i * 1.3) * 2.2);
-    ctx.strokeStyle = `rgba(${70+Math.random()*25},${28+Math.random()*18},${10+Math.random()*8},0.28)`;
-    ctx.lineWidth = 0.9 + Math.random();
-    ctx.stroke();
+  const [r,g,b] = hexRGB(base);
+  ctx.fillStyle = base; ctx.fillRect(0, 0, 256, 256);
+  for (let y = 0; y < 256; y++) {
+    for (let x = 0; x < 256; x++) {
+      const warp = Math.sin(y * 1.2) * 0.5 + 0.5;
+      const weft = Math.sin(x * 1.2) * 0.5 + 0.5;
+      const v = (warp * weft - 0.5) * 16;
+      if (Math.abs(v) > 2.5) {
+        ctx.fillStyle = `rgba(${clamp255(r+v)},${clamp255(g+v)},${clamp255(b+v)},0.38)`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
   }
   return new THREE.CanvasTexture(c);
 }
 
-function makeMarbleTexture() {
+function makeCarpetTex() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 256;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#c8c0b8'; ctx.fillRect(0, 0, 256, 256);
-  ctx.strokeStyle = 'rgba(150,145,138,0.3)'; ctx.lineWidth = 1.1;
-  for (let i = 0; i < 20; i++) {
-    const x1 = Math.random()*256, y1 = Math.random()*256;
-    const x2 = x1+(Math.random()-0.5)*200, y2 = y1+(Math.random()-0.5)*200;
-    const cpx = (x1+x2)/2+(Math.random()-0.5)*80, cpy = (y1+y2)/2+(Math.random()-0.5)*80;
-    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo(cpx,cpy,x2,y2); ctx.stroke();
+  ctx.fillStyle = '#0c0e18'; ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 9000; i++) {
+    const x = Math.random()*256, y = Math.random()*256, v = Math.random()*22;
+    ctx.fillStyle = `rgba(${v},${v},${v+10},${0.22+Math.random()*0.3})`;
+    ctx.fillRect(x, y, 1, 1);
   }
+  ctx.strokeStyle = 'rgba(28,32,58,0.22)'; ctx.lineWidth = 2.5;
+  for (let x = 0; x < 256; x += 20) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,256); ctx.stroke(); }
   return new THREE.CanvasTexture(c);
 }
 
@@ -36,19 +65,39 @@ function makeSeatbeltCanvas(active) {
   if (active) {
     ctx.fillStyle = '#ff8800'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
     ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 8;
-    ctx.fillText('FASTEN', 64, 19); ctx.fillText('SEAT BELT', 64, 34);
-    ctx.shadowBlur = 0;
+    ctx.fillText('FASTEN', 64, 19); ctx.fillText('SEAT BELT', 64, 34); ctx.shadowBlur = 0;
   }
   return new THREE.CanvasTexture(c);
 }
 
+// ── Shape helpers ─────────────────────────────────────────────────────────────
+
+function rrShape(w, h, r) {
+  r = Math.min(r, w * 0.499, h * 0.499);
+  const s = new THREE.Shape();
+  s.moveTo(-w/2+r, -h/2);
+  s.lineTo( w/2-r, -h/2);  s.absarc( w/2-r, -h/2+r, r, -Math.PI/2, 0, false);
+  s.lineTo( w/2,   h/2-r); s.absarc( w/2-r,  h/2-r, r, 0, Math.PI/2, false);
+  s.lineTo(-w/2+r, h/2);   s.absarc(-w/2+r,  h/2-r, r, Math.PI/2, Math.PI, false);
+  s.lineTo(-w/2,  -h/2+r); s.absarc(-w/2+r, -h/2+r, r, Math.PI, Math.PI*1.5, false);
+  return s;
+}
+
+function ellipseShape(rx, ry, segs = 72) {
+  const s = new THREE.Shape();
+  s.absellipse(0, 0, rx, ry, 0, Math.PI*2, false, 0);
+  return s;
+}
+
+// ── CabinGeometry ─────────────────────────────────────────────────────────────
+
 export class CabinGeometry {
   constructor(scene, windowView, seatId = '1A') {
-    this.scene      = scene;
-    this.windowView = windowView;
-    this.seatId     = seatId;
-    this.meshes     = {};
-    this.hotspotMeshes  = [];
+    this.scene         = scene;
+    this.windowView    = windowView;
+    this.seatId        = seatId;
+    this.meshes        = {};
+    this.hotspotMeshes = [];
     this.trayDeployed   = false;
     this.trayAnimating  = false;
     this.cubbyOpen      = false;
@@ -60,163 +109,354 @@ export class CabinGeometry {
 
   _mat(color, roughness = 0.7, metalness = 0.0, opts = {}) {
     return new THREE.MeshStandardMaterial({
-      color: new THREE.Color(color),
-      roughness, metalness,
-      side: THREE.DoubleSide,
-      ...opts
+      color: new THREE.Color(color), roughness, metalness, side: THREE.DoubleSide, ...opts
     });
   }
 
   _build() {
-    this._buildStructure();
+    this._buildFuselage();
+    this._buildWindows();
+    this._buildSeatBack();
     this._buildIFE();
     this._buildTrayTable();
     this._buildConsole();
-    this._buildWindow();
     this._buildCubby();
     this._buildOverhead();
     this._buildSeatHints();
   }
 
-  _buildStructure() {
-    const wallMat  = this._mat('#1c1c24', 0.75, 0.03);
-    const floorMat = this._mat('#1e1e2a', 1.0, 0.0);
-    const ceilMat  = this._mat('#1a1a22', 0.70, 0.02);
-    const partMat  = this._mat('#161620', 0.80, 0.02);
+  // ── FUSELAGE ──────────────────────────────────────────────────────────────
+  _buildFuselage() {
+    const panelTex = makePanelTex('#d2cec6');
+    panelTex.wrapS = panelTex.wrapT = THREE.RepeatWrapping;
+    panelTex.repeat.set(3, 2);
 
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 6.0), floorMat);
+    // Curved cabin shell — open cylinder, BackSide = seen from inside
+    const fusMat = new THREE.MeshStandardMaterial({
+      map: panelTex, roughness: 0.80, metalness: 0.03, side: THREE.BackSide
+    });
+    const fus = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.55, 2.55, 8.5, 96, 5, true, -Math.PI*0.53, Math.PI*1.06),
+      fusMat
+    );
+    fus.position.set(0, -0.35, -1.8);
+    this.scene.add(fus);
+    this.meshes.fuselage = fus;
+
+    // Dark navy carpet floor
+    const carpetTex = makeCarpetTex();
+    carpetTex.wrapS = carpetTex.wrapT = THREE.RepeatWrapping;
+    carpetTex.repeat.set(2, 5);
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.2, 9, 1, 1),
+      new THREE.MeshStandardMaterial({ map: carpetTex, roughness: 1.0, metalness: 0.0 })
+    );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, 0, -1.5);
+    floor.position.set(0, 0.0, -2.0);
     this.scene.add(floor); this.meshes.floor = floor;
 
-    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 6.0), ceilMat);
+    // Ceiling panel — off-white matte composite
+    const ceilMat = new THREE.MeshStandardMaterial({ color: 0xc8c4bc, roughness: 0.86, metalness: 0.0 });
+    const ceilGeo = new THREE.ExtrudeGeometry(rrShape(2.9, 7.2, 0.30), {
+      depth: 0.04, bevelEnabled: false, curveSegments: 40
+    });
+    const ceil = new THREE.Mesh(ceilGeo, ceilMat);
     ceil.rotation.x = Math.PI / 2;
-    ceil.position.set(0, 2.05, -1.5);
+    ceil.position.set(0, 2.05, -2.0);
     this.scene.add(ceil); this.meshes.ceiling = ceil;
 
-    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(6.0, 2.4), wallMat);
-    rightWall.rotation.y = -Math.PI / 2;
-    rightWall.position.set(1.35, 1.1, -1.5);
-    this.scene.add(rightWall); this.meshes.rightWall = rightWall;
+    // Warm LED mood strips on ceiling (left and right edge)
+    [-1.12, 1.12].forEach(side => {
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.032, 0.010, 6.2),
+        new THREE.MeshStandardMaterial({
+          color: 0xffe8c8, emissive: new THREE.Color('#ffd080'),
+          emissiveIntensity: 0.80, roughness: 0.08, metalness: 0.22
+        })
+      );
+      strip.position.set(side, 2.038, -2.0);
+      this.scene.add(strip);
+    });
 
-    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(6.0, 2.4), wallMat);
-    leftWall.rotation.y = Math.PI / 2;
-    leftWall.position.set(-1.0, 1.1, -1.5);
-    this.scene.add(leftWall); this.meshes.leftWall = leftWall;
+    // Forward bulkhead (wall between suites — cream, rounded)
+    const bulkGeo = new THREE.ExtrudeGeometry(rrShape(2.95, 2.15, 0.16), {
+      depth: 0.055, bevelEnabled: false, curveSegments: 28
+    });
+    const bulkhead = new THREE.Mesh(bulkGeo, new THREE.MeshStandardMaterial({ color: 0xc2beb6, roughness: 0.88, metalness: 0.02 }));
+    bulkhead.position.set(0, 1.04, -3.18);
+    this.scene.add(bulkhead); this.meshes.bulkhead = bulkhead;
 
-    const partition = new THREE.Mesh(new THREE.PlaneGeometry(3.5, 2.6), partMat);
-    partition.position.set(0, 1.1, -2.08);
-    this.scene.add(partition); this.meshes.partition = partition;
-
-    const ceilStrip = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.09, 4.5),
-      this._mat('#e8e0c0', 0.35, 0.1, { emissive: new THREE.Color('#fff8e0'), emissiveIntensity: 0.28 })
-    );
-    ceilStrip.rotation.x = Math.PI / 2;
-    ceilStrip.position.set(0, 2.04, -1.5);
-    this.scene.add(ceilStrip);
-
-    const footwellMat = this._mat('#141418', 0.9, 0.0);
-    const footwell = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.14, 0.7), footwellMat);
-    footwell.position.set(0, 0.07, -1.05);
+    // Footwell recess at base of seat-back in front
+    const footwellMat = this._mat('#0c0c14', 0.95, 0.0);
+    const footwell = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.24, 0.90), footwellMat);
+    footwell.position.set(0.05, 0.12, -1.42);
     this.scene.add(footwell); this.meshes.footwell = footwell;
+
+    // Aisle floor glow strip (floor-level amber LED)
+    const aisleGlow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.038, 0.006, 6.5),
+      new THREE.MeshStandardMaterial({ color: 0x2a1400, emissive: new THREE.Color('#c04808'), emissiveIntensity: 0.28, roughness: 0.9 })
+    );
+    aisleGlow.position.set(-0.62, 0.003, -2.0);
+    this.scene.add(aisleGlow);
   }
 
-  _buildIFE() {
-    const bezelMat = this._mat('#0d0d0f', 0.9, 0.05);
+  // ── WINDOWS ───────────────────────────────────────────────────────────────
+  _buildWindows() {
+    [{ z: -0.44, y: 1.07 }, { z: -1.40, y: 1.07 }, { z: -2.22, y: 1.07 }].forEach((wp, i) => {
+      this._buildSingleWindow(wp.z, wp.y, i);
+    });
+  }
 
-    const column = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.9, 0.14), bezelMat);
-    column.position.set(0, 0.45, -1.9);
-    this.scene.add(column); this.meshes.ifeColumn = column;
+  _buildSingleWindow(z, y, idx) {
+    const WW = 0.55, WH = 0.44;
+    const REVEAL = 0.28;
+    const TILT_Y = Math.PI / 2 - 0.14;
 
-    const bezel = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.66, 0.07), bezelMat);
-    bezel.position.set(0, 0.88, -1.91);
-    this.scene.add(bezel);
-    this.meshes.ifeBezel = bezel;
-    bezel.userData.hotspot = 'ife';
-    this.hotspotMeshes.push(bezel);
+    // Sky/view glass (uses WindowView canvas texture)
+    const glassMat = new THREE.MeshBasicMaterial({ map: this.windowView.texture });
+    const glassGeo = new THREE.ShapeGeometry(ellipseShape(WW/2, WH/2, 80), 80);
+    const glass = new THREE.Mesh(glassGeo, glassMat);
+    glass.rotation.y = TILT_Y;
+    glass.position.set(-1.43, y, z);
+    this.scene.add(glass);
+    if (idx === 1) this.meshes.windowPane = glass;
 
-    const ledStrip = new THREE.Mesh(
-      new THREE.BoxGeometry(0.96, 0.008, 0.04),
-      this._mat('#c8a030', 0.4, 0.6, { emissive: new THREE.Color('#f0c040'), emissiveIntensity: 0.8 })
+    // Frame — cream panel with oval cutout, extruded for depth/reveal
+    const outerShape = rrShape(WW + 0.20, WH + 0.20, 0.09);
+    const holePath = new THREE.Path();
+    holePath.absellipse(0, 0, WW/2 + 0.006, WH/2 + 0.006, 0, Math.PI*2, true);
+    outerShape.holes.push(holePath);
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xcecac2, roughness: 0.74, metalness: 0.05 });
+    const frameGeo = new THREE.ExtrudeGeometry(outerShape, {
+      depth: REVEAL + 0.02, bevelEnabled: false, curveSegments: 80
+    });
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    frame.rotation.y = TILT_Y;
+    frame.position.set(-1.29, y, z);
+    this.scene.add(frame);
+
+    // Reveal inner face (bright white) — the flat elliptical ring at the glass depth
+    const revealRing = rrShape(WW + 0.19, WH + 0.19, 0.09);
+    const revealHole = new THREE.Path();
+    revealHole.absellipse(0, 0, WW/2, WH/2, 0, Math.PI*2, true);
+    revealRing.holes.push(revealHole);
+    const revGeo = new THREE.ShapeGeometry(revealRing, 64);
+    const rev = new THREE.Mesh(revGeo, new THREE.MeshStandardMaterial({ color: 0xe0dcd4, roughness: 0.85, metalness: 0.0 }));
+    rev.rotation.y = TILT_Y;
+    rev.position.set(-1.285, y, z);
+    this.scene.add(rev);
+
+    // Window ambient bloom (subtle light glow around glass)
+    const bloomGeo = new THREE.ShapeGeometry(ellipseShape((WW+0.18)/2, (WH+0.18)/2, 56));
+    const bloom = new THREE.Mesh(bloomGeo, new THREE.MeshBasicMaterial({ color: 0x90b4d0, transparent: true, opacity: 0.10 }));
+    bloom.rotation.y = TILT_Y;
+    bloom.position.set(-1.26, y, z);
+    this.scene.add(bloom);
+  }
+
+  // ── SEAT BACK ─────────────────────────────────────────────────────────────
+  _buildSeatBack() {
+    const fabricTex = makeFabricTex('#161a2a');
+    fabricTex.wrapS = fabricTex.wrapT = THREE.RepeatWrapping;
+    fabricTex.repeat.set(2, 3);
+    const fabricMat = new THREE.MeshStandardMaterial({ map: fabricTex, color: 0x141828, roughness: 0.93, metalness: 0.0 });
+    const shellMat  = new THREE.MeshStandardMaterial({ color: 0x0c0e18, roughness: 0.40, metalness: 0.16 });
+    const trimMat   = new THREE.MeshStandardMaterial({ color: 0x807868, roughness: 0.26, metalness: 0.72 });
+
+    // Outer curved shell — rounded rect, extruded with bevel
+    const shellGeo = new THREE.ExtrudeGeometry(rrShape(0.62, 1.12, 0.092), {
+      depth: 0.115, bevelEnabled: true,
+      bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 18, curveSegments: 56
+    });
+    const shell = new THREE.Mesh(shellGeo, shellMat);
+    shell.rotation.x = Math.PI / 2;
+    shell.position.set(0.04, 0.88, -1.92);
+    this.scene.add(shell); this.meshes.seatShell = shell;
+
+    // Upholstered front face
+    const padGeo = new THREE.ExtrudeGeometry(rrShape(0.54, 0.98, 0.075), {
+      depth: 0.046, bevelEnabled: true,
+      bevelThickness: 0.018, bevelSize: 0.018, bevelSegments: 14, curveSegments: 48
+    });
+    const pad = new THREE.Mesh(padGeo, fabricMat);
+    pad.rotation.x = Math.PI / 2;
+    pad.position.set(0.04, 0.89, -1.876);
+    this.scene.add(pad);
+
+    // Headrest — central cylinder
+    const hrMat = new THREE.MeshStandardMaterial({ map: fabricTex, color: 0x141828, roughness: 0.93, metalness: 0.0 });
+    const hr = new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.155, 0.165, 56, 2), hrMat);
+    hr.rotation.z = Math.PI / 2;
+    hr.position.set(0.04, 1.42, -1.86);
+    this.scene.add(hr);
+
+    // Headrest wings (curved bolsters left and right)
+    [-1, 1].forEach(side => {
+      const wGeo = new THREE.ExtrudeGeometry(rrShape(0.12, 0.28, 0.04), {
+        depth: 0.10, bevelEnabled: true, bevelThickness: 0.014, bevelSize: 0.014, bevelSegments: 10, curveSegments: 40
+      });
+      const wing = new THREE.Mesh(wGeo, fabricMat);
+      wing.rotation.set(Math.PI/2, 0, side > 0 ? -0.35 : 0.35);
+      wing.position.set(0.04 + side * 0.265, 1.42, -1.89);
+      this.scene.add(wing);
+    });
+
+    // Shell trim strip (silver edge around seat shell)
+    const trimGeo = new THREE.TorusGeometry(0.316, 0.0065, 12, 120, Math.PI * 2);
+    // Use a pair of silver horizontal bars at top & bottom instead
+    [-0.555, 0.555].forEach(dy => {
+      const bar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.005, 0.005, 0.62, 16),
+        trimMat
+      );
+      bar.rotation.z = Math.PI / 2;
+      bar.position.set(0.04, 0.88 + dy, -1.985);
+      this.scene.add(bar);
+    });
+
+    // Privacy shell — left-side vertical divider
+    const privGeo = new THREE.ExtrudeGeometry(rrShape(0.07, 1.18, 0.025), {
+      depth: 0.92, bevelEnabled: false, curveSegments: 28
+    });
+    const priv = new THREE.Mesh(privGeo, new THREE.MeshStandardMaterial({ color: 0x0c0e18, roughness: 0.43, metalness: 0.14 }));
+    priv.position.set(-0.37, 0.32, -2.36);
+    this.scene.add(priv); this.meshes.privShell = priv;
+
+    // Seat-number badge (like "1A" LED label in reference photos)
+    const bc = document.createElement('canvas'); bc.width = 128; bc.height = 56;
+    const bx = bc.getContext('2d');
+    bx.fillStyle = '#060810'; bx.beginPath(); bx.roundRect(3,3,122,50,10); bx.fill();
+    bx.fillStyle = '#4090ff'; bx.shadowColor = '#3080ff'; bx.shadowBlur = 18;
+    bx.font = 'bold 26px Inter, sans-serif'; bx.textAlign = 'center'; bx.fillText(this.seatId, 64, 36);
+    const badge = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.10, 0.044),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc), transparent: true })
     );
-    ledStrip.position.set(0, 0.57, -1.88);
-    this.scene.add(ledStrip);
+    badge.rotation.y = Math.PI;
+    badge.position.set(0.04, 0.24, -1.86);
+    this.scene.add(badge);
+  }
 
-    const sw = 480, sh = 300;
+  // ── IFE SCREEN ────────────────────────────────────────────────────────────
+  _buildIFE() {
+    const bezelMat = new THREE.MeshStandardMaterial({ color: 0x060610, roughness: 0.26, metalness: 0.45 });
+    const armMat   = new THREE.MeshStandardMaterial({ color: 0x181820, roughness: 0.38, metalness: 0.58 });
+
+    // Articulating arm — two segments like real IFE mount
+    const armLow = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.016, 0.32, 28), armMat);
+    armLow.rotation.z = Math.PI / 5;
+    armLow.position.set(-0.09, 1.10, -1.78);
+    this.scene.add(armLow);
+
+    const armHi = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.015, 0.20, 24), armMat);
+    armHi.rotation.z = -Math.PI / 14;
+    armHi.position.set(0.02, 1.30, -1.70);
+    this.scene.add(armHi);
+
+    // IFE bezel — rounded rect housing
+    const bezelShape = rrShape(0.66, 0.43, 0.038);
+    const bezelGeo = new THREE.ExtrudeGeometry(bezelShape, {
+      depth: 0.030, bevelEnabled: true,
+      bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 10, curveSegments: 40
+    });
+    const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+    bezel.rotation.set(Math.PI/2, 0, 0.07);
+    bezel.position.set(0.04, 1.315, -1.652);
+    this.scene.add(bezel); this.meshes.ifeBezel = bezel;
+    bezel.userData.hotspot = 'ife'; this.hotspotMeshes.push(bezel);
+
+    // Screen canvas
+    const sw = 1024, sh = 640;
     const sc = document.createElement('canvas'); sc.width = sw; sc.height = sh;
-    const sctx = sc.getContext('2d');
-    const grad = sctx.createLinearGradient(0, 0, 0, sh);
-    grad.addColorStop(0, '#020818'); grad.addColorStop(1, '#050614');
-    sctx.fillStyle = grad; sctx.fillRect(0, 0, sw, sh);
-
-    sctx.strokeStyle = 'rgba(240,192,64,0.45)'; sctx.lineWidth = 2;
-    sctx.strokeRect(12, 12, sw - 24, sh - 24);
-    sctx.strokeStyle = 'rgba(240,192,64,0.12)'; sctx.lineWidth = 1;
-    sctx.strokeRect(18, 18, sw - 36, sh - 36);
-
-    sctx.fillStyle = '#f0c040';
-    sctx.font = 'bold 52px sans-serif'; sctx.textAlign = 'center'; sctx.textBaseline = 'middle';
-    sctx.shadowColor = '#f0c040'; sctx.shadowBlur = 24;
-    sctx.fillText('CABIN', sw/2, 100); sctx.shadowBlur = 0;
-
-    sctx.fillStyle = 'rgba(240,192,64,0.55)';
-    sctx.font = '500 14px sans-serif';
-    sctx.fillText('CLICK TO OPEN IFE', sw/2, 170);
-
-    sctx.fillStyle = 'rgba(255,255,255,0.18)';
-    sctx.font = '12px sans-serif';
-    sctx.fillText('MAP  ·  TASKS  ·  CLOCK  ·  TAIL CAM', sw/2, 212);
-
-    sctx.strokeStyle = 'rgba(255,255,255,0.04)';
-    sctx.lineWidth = 1;
-    for (let i = 1; i <= 3; i++) {
-      sctx.beginPath(); sctx.moveTo(i * sw/4, sh/2); sctx.lineTo(i * sw/4, sh - 30); sctx.stroke();
-    }
-    sctx.fillStyle = 'rgba(240,192,64,0.3)'; sctx.font = '10px sans-serif';
-    ['MAP','CLOCK','TASKS','TAIL CAM'].forEach((t, i) => {
-      sctx.fillText(t, (i + 0.5) * sw/4, sh - 16);
-    });
-
-    const screenTex = new THREE.CanvasTexture(sc);
-    const screenMat = new THREE.MeshStandardMaterial({
-      map: screenTex,
-      emissive: new THREE.Color('#1a3060'),
-      emissiveIntensity: 1.3,
-      roughness: 0.04,
-      side: THREE.DoubleSide
-    });
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.93, 0.58), screenMat);
-    screen.position.set(0, 0.88, -1.877);
+    this._drawIFECanvas(sc.getContext('2d'), sw, sh);
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.59, 0.375),
+      new THREE.MeshStandardMaterial({
+        map: new THREE.CanvasTexture(sc),
+        emissive: new THREE.Color('#0c1e4a'),
+        emissiveIntensity: 1.15, roughness: 0.04
+      })
+    );
+    screen.rotation.set(0, 0, 0.07);
+    screen.position.set(0.04, 1.315, -1.638);
     this.scene.add(screen);
     this.meshes.ifeScreen = screen;
-    screen.userData.hotspot = 'ife';
-    this.hotspotMeshes.push(screen);
+    screen.userData.hotspot = 'ife'; this.hotspotMeshes.push(screen);
+
+    // Seatbelt sign (overhead panel)
+    this.seatbeltTex = makeSeatbeltCanvas(false);
+    const sbSign = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.18, 0.068),
+      new THREE.MeshStandardMaterial({
+        map: this.seatbeltTex, emissive: 0xff8800,
+        emissiveIntensity: 0, roughness: 0.3, side: THREE.DoubleSide
+      })
+    );
+    sbSign.position.set(0.12, 1.982, -0.54);
+    this.scene.add(sbSign); this.meshes.seatbeltSign = sbSign;
   }
 
-  _buildTrayTable() {
-    const woodTex = makeWoodTexture();
-    const trayTopMat = new THREE.MeshStandardMaterial({
-      map: woodTex, roughness: 0.82, metalness: 0.0, side: THREE.DoubleSide
+  _drawIFECanvas(ctx, W, H) {
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#010c1e'); bg.addColorStop(1, '#020810');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+    // Status bar
+    ctx.fillStyle = '#08162a'; ctx.fillRect(0, 0, W, 52);
+    ctx.strokeStyle = 'rgba(240,192,64,0.28)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0,52); ctx.lineTo(W,52); ctx.stroke();
+    ctx.fillStyle = '#f0c040'; ctx.font = '600 18px Inter,sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('CABIN AIR', 22, 34);
+    ctx.fillStyle = 'rgba(200,180,120,0.65)'; ctx.font = '500 14px Inter,sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('BUSINESS CLASS · GATE-TO-GATE', W/2, 34);
+    ctx.fillStyle = 'rgba(180,190,220,0.40)'; ctx.font = '13px Inter,sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('TAP TO OPEN  ▶', W-22, 34);
+    // Logo
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f0c040'; ctx.shadowColor = '#f0c040'; ctx.shadowBlur = 32;
+    ctx.font = 'bold 100px "Instrument Serif",serif';
+    ctx.fillText('CABIN', W/2, H/2 + 24); ctx.shadowBlur = 0;
+    // Tagline
+    ctx.fillStyle = 'rgba(200,178,100,0.55)'; ctx.font = '500 16px Inter,sans-serif';
+    ctx.fillText('GATE · TO · GATE  PRODUCTIVITY', W/2, H/2 + 70);
+    // Flight-path dots
+    const dotY = H * 0.81;
+    for (let i = 0; i < 11; i++) {
+      const x = W*0.15 + i*(W*0.70/10);
+      ctx.beginPath(); ctx.arc(x, dotY, i===5 ? 7 : 3.5, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(240,192,64,${i<=5?0.92:0.26})`; ctx.fill();
+    }
+    // Tab bar
+    ctx.fillStyle = '#060e1e'; ctx.fillRect(0, H-62, W, 62);
+    ctx.strokeStyle = 'rgba(240,192,64,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, H-62); ctx.lineTo(W, H-62); ctx.stroke();
+    ['MAP','CLOCK','TASKS','TAIL CAM'].forEach((t, i) => {
+      ctx.fillStyle = 'rgba(240,192,64,0.55)'; ctx.font = '600 15px Inter,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(t, W*(i+0.5)/4, H-22);
     });
-    const trayBotMat = this._mat('#1a1a1e', 0.9, 0.0);
+  }
 
+  // ── TRAY TABLE ────────────────────────────────────────────────────────────
+  _buildTrayTable() {
+    const trayMat = new THREE.MeshStandardMaterial({ color: 0x222018, roughness: 0.30, metalness: 0.30 });
     const trayGroup = new THREE.Group();
-    const top = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.025, 0.42), trayTopMat);
-    top.position.set(0, 0.012, 0);
-    trayGroup.add(top);
-    const bot = new THREE.Mesh(new THREE.BoxGeometry(0.60, 0.012, 0.42), trayBotMat);
-    bot.position.set(0, -0.006, 0);
-    trayGroup.add(bot);
+    const trayShape = rrShape(0.58, 0.42, 0.042);
+    const trayGeo = new THREE.ExtrudeGeometry(trayShape, {
+      depth: 0.014, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 10, curveSegments: 40
+    });
+    const trayMesh = new THREE.Mesh(trayGeo, trayMat);
+    trayMesh.rotation.x = Math.PI / 2;
+    trayGroup.add(trayMesh);
+    trayMesh.userData.hotspot = 'tray';
 
-    trayGroup.position.set(0, 0.80, -1.68);
+    trayGroup.position.set(0.0, 0.80, -1.72);
     trayGroup.rotation.x = -Math.PI / 2;
     this.scene.add(trayGroup);
     this.meshes.tray = trayGroup;
     trayGroup.userData.hotspot = 'tray';
-    this.hotspotMeshes.push(trayGroup.children[0]);
-    trayGroup.children[0].userData.hotspot = 'tray';
+    this.hotspotMeshes.push(trayMesh);
 
+    // Notebook (hidden by default)
     const notebook = new THREE.Mesh(
       new THREE.BoxGeometry(0.22, 0.008, 0.16),
       this._mat('#f5f0e8', 0.88, 0.0)
@@ -228,184 +468,221 @@ export class CabinGeometry {
     notebook.userData.hotspot = 'notebook';
     this.hotspotMeshes.push(notebook);
 
-    this._trayStowedPos  = new THREE.Vector3(0, 0.80, -1.68);
-    this._trayStowedRotX = -Math.PI / 2;
-    this._trayDeployedPos  = new THREE.Vector3(0, 0.64, -0.88);
+    this._trayStowedPos   = new THREE.Vector3(0, 0.80, -1.72);
+    this._trayStowedRotX  = -Math.PI / 2;
+    this._trayDeployedPos = new THREE.Vector3(0, 0.64, -0.88);
     this._trayDeployedRotX = 0;
   }
 
+  // ── CONSOLE ───────────────────────────────────────────────────────────────
   _buildConsole() {
-    const consoleMat = new THREE.MeshStandardMaterial({
-      map: makeMarbleTexture(), roughness: 0.28, metalness: 0.06, side: THREE.DoubleSide
-    });
-    const darkMat = this._mat('#111115', 0.85, 0.0);
+    const consoleMat = new THREE.MeshStandardMaterial({ color: 0x0e0e16, roughness: 0.50, metalness: 0.22 });
+    const surfMat    = new THREE.MeshStandardMaterial({ color: 0x141420, roughness: 0.26, metalness: 0.34 });
+    const trimMat    = new THREE.MeshStandardMaterial({ color: 0x848070, roughness: 0.25, metalness: 0.75 });
 
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.78, 1.0), consoleMat);
-    body.position.set(0.86, 0.39, -0.52);
+    // Main console body — dark rounded block
+    const bodyGeo = new THREE.ExtrudeGeometry(rrShape(0.46, 0.94, 0.058), {
+      depth: 0.94, bevelEnabled: false, curveSegments: 48
+    });
+    const body = new THREE.Mesh(bodyGeo, consoleMat);
+    body.rotation.set(0, 0, Math.PI/2);
+    body.position.set(1.10, 0.46, -0.72);
     this.scene.add(body); this.meshes.consoleBody = body;
 
-    const surface = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.04, 1.0), consoleMat);
-    surface.position.set(0.86, 0.79, -0.52);
-    this.scene.add(surface); this.meshes.consoleSurface = surface;
+    // Console top surface (slightly glossy)
+    const topGeo = new THREE.ExtrudeGeometry(rrShape(0.48, 0.96, 0.058), {
+      depth: 0.022, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 10, curveSegments: 40
+    });
+    const topSurf = new THREE.Mesh(topGeo, surfMat);
+    topSurf.rotation.x = Math.PI/2;
+    topSurf.position.set(0.89, 0.876, -0.72);
+    this.scene.add(topSurf); this.meshes.consoleSurface = topSurf;
 
-    const innerBack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.72, 0.06), darkMat);
-    innerBack.position.set(0.86, 0.39, -1.01);
-    this.scene.add(innerBack);
+    // Silver trim rail (front edge)
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.95, 20), trimMat);
+    rail.position.set(1.075, 0.46, -0.245);
+    this.scene.add(rail);
 
+    // Seat-control buttons — 4 rounded-square buttons with coloured LED
     const labels = ['Upright', 'Lounge', 'Bed', 'Lumbar'];
-    const btnColors = ['#2a2a3a','#252535','#222230','#202030'];
+    const ledColors = [0xf0c040, 0x40cc80, 0x4090f0, 0xff5828];
     labels.forEach((lbl, i) => {
-      const btn = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.04, 0.04, 0.016, 16),
+      const bGeo = new THREE.ExtrudeGeometry(rrShape(0.054, 0.054, 0.011), {
+        depth: 0.014, bevelEnabled: true,
+        bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 8, curveSegments: 24
+      });
+      const btn = new THREE.Mesh(bGeo, new THREE.MeshStandardMaterial({
+        color: 0x1c1c2c, roughness: 0.30, metalness: 0.80,
+        emissive: 0x080812, emissiveIntensity: 0.3
+      }));
+      btn.rotation.set(Math.PI/2, 0, 0);
+      btn.position.set(0.79, 0.83, -0.24 - i*0.115);
+      this.scene.add(btn);
+      btn.userData.hotspot = 'seatBtn'; btn.userData.btnIndex = i;
+      btn.userData.btnLabel = lbl; btn.userData.baseY = btn.position.y;
+      this.hotspotMeshes.push(btn); this.meshes[`seatBtn${i}`] = btn;
+
+      // LED pip
+      const led = new THREE.Mesh(
+        new THREE.CircleGeometry(0.0085, 22),
         new THREE.MeshStandardMaterial({
-          color: new THREE.Color(btnColors[i]),
-          roughness: 0.4, metalness: 0.6, side: THREE.DoubleSide
+          color: new THREE.Color(ledColors[i]),
+          emissive: new THREE.Color(ledColors[i]),
+          emissiveIntensity: 0.72, roughness: 0.18, metalness: 0.10
         })
       );
-      btn.position.set(0.8, 0.815, -0.22 - i * 0.115);
-      btn.rotation.x = Math.PI / 2;
-      this.scene.add(btn);
-      btn.userData.hotspot = 'seatBtn';
-      btn.userData.btnIndex = i;
-      btn.userData.btnLabel = lbl;
-      btn.userData.baseY = btn.position.y;
-      this.hotspotMeshes.push(btn);
-      this.meshes[`seatBtn${i}`] = btn;
+      led.position.set(0.788, 0.833, -0.24 - i*0.115);
+      this.scene.add(led); this.meshes[`seatLed${i}`] = led;
     });
-  }
 
-  _buildWindow() {
-    const frameMat = this._mat('#8a8a9a', 0.35, 0.75);
-
-    const frameGroup = new THREE.Group();
-    const frameH = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.055, 0.055), frameMat);
-    frameH.position.y =  0.265; frameGroup.add(frameH.clone());
-    frameH.position.y = -0.265; frameGroup.add(frameH);
-    const frameV = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.585, 0.055), frameMat);
-    frameV.position.x =  0.38; frameGroup.add(frameV.clone());
-    frameV.position.x = -0.38; frameGroup.add(frameV);
-
-    const glassMat = new THREE.MeshBasicMaterial({
-      map: this.windowView.texture,
-      side: THREE.FrontSide
-    });
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(0.70, 0.50), glassMat);
-    glass.position.set(0, 0, 0.02);
-    frameGroup.add(glass);
-    this.meshes.windowPane = glass;
-
-    frameGroup.position.set(-0.70, 0.88, -0.62);
-    frameGroup.rotation.y = 0.22;
-    this.scene.add(frameGroup);
-    this.meshes.windowGroup = frameGroup;
-
-    const innerReveal = new THREE.Mesh(
-      new THREE.BoxGeometry(0.08, 0.62, 0.55),
-      this._mat('#222228', 0.7, 0.05)
+    // Amber under-light strip (like photos — warm LED under tray lip)
+    const underLight = new THREE.Mesh(
+      new THREE.BoxGeometry(0.005, 0.010, 0.75),
+      new THREE.MeshStandardMaterial({ color: 0x3a1600, emissive: new THREE.Color('#ff8c18'), emissiveIntensity: 0.52, roughness: 0.18 })
     );
-    innerReveal.position.set(-0.75, 0.88, -0.35);
-    innerReveal.rotation.y = 0.22;
-    this.scene.add(innerReveal);
+    underLight.position.set(0.65, 0.46, -0.72);
+    this.scene.add(underLight);
   }
 
+  // ── CUBBY / STORAGE ───────────────────────────────────────────────────────
   _buildCubby() {
-    const cubbyMat = this._mat('#161618', 0.85, 0.0);
-    const doorMat  = this._mat('#1e1e26', 0.72, 0.08);
+    const cubbyMat = this._mat('#121216', 0.88, 0.0);
+    const doorMat  = new THREE.MeshStandardMaterial({ color: 0x1c1c28, roughness: 0.50, metalness: 0.20 });
 
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.26, 0.28), cubbyMat);
-    body.position.set(0.86, 0.52, -0.90);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.25, 0.27), cubbyMat);
+    body.position.set(0.86, 0.53, -0.95);
     this.scene.add(body); this.meshes.cubbyBody = body;
 
-    const door = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.24, 0.03), doorMat);
-    door.position.set(0.86, 0.52, -0.765);
-    this.scene.add(door);
-    this.meshes.cubbyDoor = door;
-    door.userData.hotspot = 'cubbyDoor';
-    this.hotspotMeshes.push(door);
+    // Rounded door
+    const doorGeo = new THREE.ExtrudeGeometry(rrShape(0.31, 0.23, 0.032), {
+      depth: 0.025, bevelEnabled: false, curveSegments: 28
+    });
+    const door = new THREE.Mesh(doorGeo, doorMat);
+    door.rotation.x = Math.PI/2;
+    door.position.set(0.86, 0.53, -0.80);
+    this.scene.add(door); this.meshes.cubbyDoor = door;
+    door.userData.hotspot = 'cubbyDoor'; this.hotspotMeshes.push(door);
     this._cubbyDoorClosedY = door.position.y;
 
+    // Handle bar
+    const handle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.0065, 0.0065, 0.09, 20),
+      new THREE.MeshStandardMaterial({ color: 0x888880, roughness: 0.26, metalness: 0.88 })
+    );
+    handle.rotation.x = Math.PI/2; handle.position.set(0.86, 0.532, -0.787);
+    this.scene.add(handle);
+
+    // Bottle (hidden)
     const bottle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.018, 0.02, 0.12, 10),
+      new THREE.CylinderGeometry(0.018, 0.020, 0.12, 26),
       this._mat('#c8e6f5', 0.2, 0.0, { emissive: new THREE.Color('#a0c8e0'), emissiveIntensity: 0.12 })
     );
-    bottle.position.set(0.80, 0.51, -0.90);
-    bottle.visible = false;
-    this.scene.add(bottle);
-    this.meshes.bottle = bottle;
-    bottle.userData.hotspot = 'bottle';
-    this.hotspotMeshes.push(bottle);
+    bottle.position.set(0.80, 0.52, -0.95); bottle.visible = false;
+    this.scene.add(bottle); this.meshes.bottle = bottle;
+    bottle.userData.hotspot = 'bottle'; this.hotspotMeshes.push(bottle);
 
-    const band = new THREE.Mesh(
-      new THREE.TorusGeometry(0.038, 0.008, 8, 20),
-      this._mat('#2a2a32', 0.5, 0.4)
-    );
-    band.position.set(0.93, 0.55, -0.90);
-    band.rotation.y = Math.PI / 2;
-    band.visible = false;
+    // Headphones (hidden)
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.038, 0.008, 14, 36), this._mat('#2a2a32', 0.5, 0.4));
+    band.position.set(0.93, 0.56, -0.95); band.rotation.y = Math.PI/2; band.visible = false;
     this.scene.add(band);
-    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.078, 6), this._mat('#2a2a32', 0.5, 0.4));
-    bar.rotation.z = Math.PI / 2;
-    bar.position.copy(band.position);
-    bar.visible = false;
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.078, 12), this._mat('#2a2a32', 0.5, 0.4));
+    bar.rotation.z = Math.PI/2; bar.position.copy(band.position); bar.visible = false;
     this.scene.add(bar);
     this.meshes.headphones = { visible: false,
       set visible(v) { band.visible = v; bar.visible = v; },
       get visible() { return band.visible; }
     };
-    band.userData.hotspot = 'headphones';
-    bar.userData.hotspot  = 'headphones';
-    this.hotspotMeshes.push(band); this.hotspotMeshes.push(bar);
+    band.userData.hotspot = 'headphones'; bar.userData.hotspot = 'headphones';
+    this.hotspotMeshes.push(band, bar);
   }
 
+  // ── OVERHEAD PSU ──────────────────────────────────────────────────────────
   _buildOverhead() {
-    const binMat = this._mat('#b0adb8', 0.58, 0.08);
-    const bin = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.32, 0.65), binMat);
-    bin.position.set(0, 1.70, -0.65);
-    this.scene.add(bin); this.meshes.overheadBin = bin;
+    const psuMat = new THREE.MeshStandardMaterial({ color: 0xc4c0b8, roughness: 0.86, metalness: 0.02 });
+    const psuGeo = new THREE.ExtrudeGeometry(rrShape(0.58, 0.32, 0.028), { depth: 0.026, bevelEnabled: false, curveSegments: 28 });
+    const psu = new THREE.Mesh(psuGeo, psuMat);
+    psu.rotation.x = Math.PI/2; psu.position.set(0.0, 2.028, -0.54);
+    this.scene.add(psu); this.meshes.overhead = psu;
 
-    const binFront = new THREE.Mesh(new THREE.PlaneGeometry(1.82, 0.32), this._mat('#9a97a2', 0.6, 0.06));
-    binFront.position.set(0, 1.70, -0.325);
-    this.scene.add(binFront);
-
+    // Air gasper (circular vent nozzle)
     const gasper = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.022, 0.026, 0.04, 10),
-      this._mat('#8a8a9a', 0.45, 0.55)
+      new THREE.CylinderGeometry(0.023, 0.027, 0.04, 30),
+      new THREE.MeshStandardMaterial({ color: 0x909090, roughness: 0.28, metalness: 0.85 })
     );
-    gasper.position.set(-0.18, 1.546, -0.65);
-    this.scene.add(gasper);
-    this.meshes.gasper = gasper;
-    gasper.userData.hotspot = 'gasper';
-    this.hotspotMeshes.push(gasper);
+    gasper.position.set(-0.13, 1.990, -0.54);
+    this.scene.add(gasper); this.meshes.gasper = gasper;
+    gasper.userData.hotspot = 'gasper'; this.hotspotMeshes.push(gasper);
 
-    this.seatbeltTex = makeSeatbeltCanvas(false);
-    const sbSign = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.26, 0.09),
-      new THREE.MeshStandardMaterial({
-        map: this.seatbeltTex,
-        emissive: new THREE.Color('#ff8800'),
-        emissiveIntensity: 0,
-        roughness: 0.3, side: THREE.DoubleSide
-      })
+    // Reading light nozzle
+    const lightNozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.022, 0.033, 22), new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.26, metalness: 0.82 }));
+    lightNozzle.position.set(0.15, 1.990, -0.54); this.scene.add(lightNozzle);
+
+    // Call button (amber/red indicator)
+    const callBtn = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.011, 0.011, 0.010, 22),
+      new THREE.MeshStandardMaterial({ color: 0xcc2020, emissive: 0x881010, emissiveIntensity: 0.45, roughness: 0.28 })
     );
-    sbSign.position.set(0.12, 1.546, -0.65);
-    this.scene.add(sbSign);
-    this.meshes.seatbeltSign = sbSign;
+    callBtn.position.set(0.0, 1.990, -0.36); this.scene.add(callBtn);
   }
 
+  // ── SEAT HINTS (your own seat) ────────────────────────────────────────────
   _buildSeatHints() {
-    const seatMat = this._mat('#1a1a20', 0.65, 0.08);
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.38), seatMat);
-    leftArm.position.set(-0.36, 0.68, 0.08);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x7a7060, roughness: 0.50, metalness: 0.35 });
+    const fabricMat = new THREE.MeshStandardMaterial({
+      map: makeFabricTex('#14182a'), color: 0x14182a, roughness: 0.95, metalness: 0.0
+    });
+
+    // Armrests — rounded extrusions
+    const armGeo = new THREE.ExtrudeGeometry(rrShape(0.155, 0.82, 0.032), {
+      depth: 0.050, bevelEnabled: true, bevelThickness: 0.011, bevelSize: 0.011, bevelSegments: 12, curveSegments: 40
+    });
+    const leftArm = new THREE.Mesh(armGeo, armMat);
+    leftArm.rotation.x = Math.PI/2; leftArm.position.set(-0.54, 0.645, -0.42);
     this.scene.add(leftArm); this.meshes.leftArm = leftArm;
 
-    const rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.38), seatMat);
-    rightArm.position.set(0.36, 0.68, 0.08);
+    const rightArm = new THREE.Mesh(armGeo, armMat);
+    rightArm.rotation.x = Math.PI/2; rightArm.position.set(0.54, 0.645, -0.42);
     this.scene.add(rightArm); this.meshes.rightArm = rightArm;
 
-    const headPad = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 0.04), seatMat);
-    headPad.position.set(0, 0.90, 0.22);
-    this.scene.add(headPad); this.meshes.headPad = headPad;
+    // Seat cushion
+    const cushGeo = new THREE.ExtrudeGeometry(rrShape(0.72, 0.60, 0.065), {
+      depth: 0.065, bevelEnabled: true, bevelThickness: 0.020, bevelSize: 0.020, bevelSegments: 14, curveSegments: 48
+    });
+    const cushion = new THREE.Mesh(cushGeo, fabricMat);
+    cushion.rotation.x = Math.PI/2; cushion.position.set(0, 0.47, -0.18);
+    this.scene.add(cushion);
+
+    // White pillow
+    const pillowGeo = new THREE.ExtrudeGeometry(rrShape(0.34, 0.26, 0.045), {
+      depth: 0.108, bevelEnabled: true, bevelThickness: 0.026, bevelSize: 0.026, bevelSegments: 14, curveSegments: 40
+    });
+    const pillow = new THREE.Mesh(pillowGeo, new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.96, metalness: 0.0 }));
+    pillow.rotation.set(Math.PI/2, 0, 0.16); pillow.position.set(-0.04, 0.56, 0.04);
+    this.scene.add(pillow);
+
+    // Seatbelt strap
+    const belt = new THREE.Mesh(
+      new THREE.BoxGeometry(0.028, 0.005, 0.54),
+      new THREE.MeshStandardMaterial({ color: 0x262432, roughness: 0.82, metalness: 0.22 })
+    );
+    belt.position.set(0.16, 0.465, -0.11); belt.rotation.z = 0.12;
+    this.scene.add(belt);
+
+    // Seat number on armrest
+    const nc = document.createElement('canvas'); nc.width = 128; nc.height = 58;
+    const nx = nc.getContext('2d');
+    nx.fillStyle = '#070910'; nx.beginPath(); nx.roundRect(3,3,122,52,10); nx.fill();
+    nx.fillStyle = '#5090ff'; nx.shadowColor = '#3878ee'; nx.shadowBlur = 18;
+    nx.font = 'bold 28px Inter,sans-serif'; nx.textAlign = 'center'; nx.fillText(this.seatId, 64, 38);
+    const numBadge = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.090, 0.042),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc), transparent: true })
+    );
+    numBadge.rotation.x = -Math.PI/2 + 0.26; numBadge.position.set(-0.54, 0.664, -0.22);
+    this.scene.add(numBadge);
   }
+
+  // ── INTERACTION METHODS ───────────────────────────────────────────────────
 
   deployTray(instant = false) {
     if (this.trayDeployed || this.trayAnimating) return;
@@ -414,20 +691,19 @@ export class CabinGeometry {
     if (instant) {
       tray.position.copy(this._trayDeployedPos);
       tray.rotation.x = this._trayDeployedRotX;
-      this.trayDeployed  = true;
-      this.trayAnimating = false;
+      this.trayDeployed = true; this.trayAnimating = false;
       if (this.meshes.notebook) this.meshes.notebook.visible = true;
       return;
     }
-    const dur = 400, t0 = performance.now();
-    const spX = this._trayStowedPos.x, spY = this._trayStowedPos.y, spZ = this._trayStowedPos.z;
-    const epX = this._trayDeployedPos.x, epY = this._trayDeployedPos.y, epZ = this._trayDeployedPos.z;
+    const dur = 420, t0 = performance.now();
+    const { x: spX, y: spY, z: spZ } = this._trayStowedPos;
+    const { x: epX, y: epY, z: epZ } = this._trayDeployedPos;
     const srX = this._trayStowedRotX, erX = this._trayDeployedRotX;
     const anim = () => {
-      const t = Math.min(1, (performance.now() - t0) / dur);
-      const e = 1 - Math.pow(1 - t, 3);
-      tray.position.set(spX + (epX-spX)*e, spY + (epY-spY)*e, spZ + (epZ-spZ)*e);
-      tray.rotation.x = srX + (erX - srX) * e;
+      const t = Math.min(1, (performance.now()-t0)/dur);
+      const e = 1-Math.pow(1-t, 3);
+      tray.position.set(spX+(epX-spX)*e, spY+(epY-spY)*e, spZ+(epZ-spZ)*e);
+      tray.rotation.x = srX+(erX-srX)*e;
       if (t < 1) { requestAnimationFrame(anim); } else {
         this.trayDeployed = true; this.trayAnimating = false;
         if (this.meshes.notebook) this.meshes.notebook.visible = true;
@@ -441,18 +717,16 @@ export class CabinGeometry {
     this.trayAnimating = true;
     if (this.meshes.notebook) this.meshes.notebook.visible = false;
     const tray = this.meshes.tray;
-    const dur = 350, t0 = performance.now();
-    const spX = this._trayDeployedPos.x, spY = this._trayDeployedPos.y, spZ = this._trayDeployedPos.z;
-    const epX = this._trayStowedPos.x, epY = this._trayStowedPos.y, epZ = this._trayStowedPos.z;
+    const dur = 360, t0 = performance.now();
+    const { x: spX, y: spY, z: spZ } = this._trayDeployedPos;
+    const { x: epX, y: epY, z: epZ } = this._trayStowedPos;
     const srX = this._trayDeployedRotX, erX = this._trayStowedRotX;
     const anim = () => {
-      const t = Math.min(1, (performance.now() - t0) / dur);
-      const e = 1 - Math.pow(1 - t, 3);
-      tray.position.set(spX + (epX-spX)*e, spY + (epY-spY)*e, spZ + (epZ-spZ)*e);
-      tray.rotation.x = srX + (erX - srX) * e;
-      if (t < 1) { requestAnimationFrame(anim); } else {
-        this.trayDeployed = false; this.trayAnimating = false;
-      }
+      const t = Math.min(1, (performance.now()-t0)/dur);
+      const e = 1-Math.pow(1-t, 3);
+      tray.position.set(spX+(epX-spX)*e, spY+(epY-spY)*e, spZ+(epZ-spZ)*e);
+      tray.rotation.x = srX+(erX-srX)*e;
+      if (t < 1) { requestAnimationFrame(anim); } else { this.trayDeployed = false; this.trayAnimating = false; }
     };
     requestAnimationFrame(anim);
   }
@@ -463,8 +737,8 @@ export class CabinGeometry {
     const door = this.meshes.cubbyDoor;
     const startY = door.position.y, t0 = performance.now();
     const anim = () => {
-      const t = Math.min(1, (performance.now() - t0) / 280);
-      const e = 1 - Math.pow(1 - t, 3);
+      const t = Math.min(1, (performance.now()-t0)/280);
+      const e = 1-Math.pow(1-t, 3);
       door.position.y = startY + e * 0.22;
       if (t < 1) { requestAnimationFrame(anim); } else {
         door.visible = false;
@@ -485,9 +759,9 @@ export class CabinGeometry {
     if (this.meshes.headphones) this.meshes.headphones.visible = false;
     const t0 = performance.now();
     const anim = () => {
-      const t = Math.min(1, (performance.now() - t0) / 280);
-      const e = 1 - Math.pow(1 - t, 3);
-      door.position.y = (this._cubbyDoorClosedY + 0.22) - e * 0.22;
+      const t = Math.min(1, (performance.now()-t0)/280);
+      const e = 1-Math.pow(1-t, 3);
+      door.position.y = (this._cubbyDoorClosedY + 0.22) - e*0.22;
       if (t < 1) requestAnimationFrame(anim);
     };
     requestAnimationFrame(anim);
@@ -499,10 +773,7 @@ export class CabinGeometry {
     btn._animating = true;
     const baseY = btn.userData.baseY;
     btn.position.y = baseY - 0.004;
-    setTimeout(() => {
-      btn.position.y = baseY;
-      btn._animating = false;
-    }, 120);
+    setTimeout(() => { btn.position.y = baseY; btn._animating = false; }, 120);
   }
 
   setSeatbeltSign(active) {
@@ -522,31 +793,21 @@ export class CabinGeometry {
     const c = document.createElement('canvas'); c.width = 200; c.height = 200;
     const ctx = c.getContext('2d');
     ctx.fillStyle = '#f5f0e8'; ctx.fillRect(0, 0, 200, 200);
-    ctx.beginPath(); ctx.arc(100, 100, 70, 0, Math.PI*2);
-    ctx.fillStyle = '#e8e0d0'; ctx.fill();
+    ctx.beginPath(); ctx.arc(100, 100, 70, 0, Math.PI*2); ctx.fillStyle = '#e8e0d0'; ctx.fill();
     ctx.strokeStyle = '#ccc0a8'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#8B6040';
-    ctx.beginPath(); ctx.ellipse(85, 90, 22, 14, -0.3, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#6B8A50';
-    ctx.beginPath(); ctx.ellipse(115, 100, 12, 18, 0.5, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#C04030';
-    ctx.beginPath(); ctx.ellipse(100, 115, 14, 10, 0, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#8B6040'; ctx.beginPath(); ctx.ellipse(85, 90, 22, 14, -0.3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#6B8A50'; ctx.beginPath(); ctx.ellipse(115, 100, 12, 18, 0.5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#C04030'; ctx.beginPath(); ctx.ellipse(100, 115, 14, 10, 0, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#334'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(meal.label || 'Meal service', 100, 186);
-    const tex = new THREE.CanvasTexture(c);
-    const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, opacity: 0, roughness: 0.8 });
+    const mat = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(c), transparent: true, opacity: 0, roughness: 0.8 });
     this.mealCard = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), mat);
     this.mealCard.position.set(0.05, 0.658, -0.88);
-    this.mealCard.rotation.x = -Math.PI / 2;
+    this.mealCard.rotation.x = -Math.PI/2;
     this.scene.add(this.mealCard);
-    this.mealCard.userData.hotspot = 'meal';
-    this.hotspotMeshes.push(this.mealCard);
+    this.mealCard.userData.hotspot = 'meal'; this.hotspotMeshes.push(this.mealCard);
     const t0 = performance.now();
-    const fade = () => {
-      const t = Math.min(1, (performance.now() - t0) / 1200);
-      mat.opacity = t * 0.9;
-      if (t < 1) requestAnimationFrame(fade);
-    };
+    const fade = () => { const t = Math.min(1,(performance.now()-t0)/1200); mat.opacity = t*0.9; if(t<1) requestAnimationFrame(fade); };
     requestAnimationFrame(fade);
   }
 
@@ -558,7 +819,5 @@ export class CabinGeometry {
     this.mealCard = null;
   }
 
-  update(dt) {
-    // per-frame updates if needed
-  }
+  update(dt) { /* per-frame hook */ }
 }

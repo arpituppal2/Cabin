@@ -4,14 +4,14 @@ import { WindowView } from './WindowView.js';
 import { CameraRig } from './CameraRig.js';
 
 const PHASE_LIGHTING = {
-  BOARDING: { ambColor: 0x2a2860, ambInt: 0.55, dirInt: 1.0 },
-  TAXI:     { ambColor: 0x2a2860, ambInt: 0.58, dirInt: 1.05 },
-  TAKEOFF:  { ambColor: 0x202060, ambInt: 0.60, dirInt: 1.15 },
-  CRUISE:   { ambColor: 0x181840, ambInt: 0.45, dirInt: 1.2  },
-  BREAK:    { ambColor: 0x181840, ambInt: 0.45, dirInt: 1.2  },
-  DESCENT:  { ambColor: 0x1a1a40, ambInt: 0.50, dirInt: 1.1  },
-  LANDING:  { ambColor: 0x2a2860, ambInt: 0.60, dirInt: 1.05 },
-  ARRIVED:  { ambColor: 0x303060, ambInt: 0.70, dirInt: 0.95 },
+  BOARDING: { ambColor: 0x1e1e30, ambInt: 0.72, dirInt: 0.95 },
+  TAXI:     { ambColor: 0x1c1c2e, ambInt: 0.76, dirInt: 1.00 },
+  TAKEOFF:  { ambColor: 0x181828, ambInt: 0.82, dirInt: 1.10 },
+  CRUISE:   { ambColor: 0x141420, ambInt: 0.60, dirInt: 1.20 },
+  BREAK:    { ambColor: 0x141420, ambInt: 0.60, dirInt: 1.20 },
+  DESCENT:  { ambColor: 0x181828, ambInt: 0.66, dirInt: 1.10 },
+  LANDING:  { ambColor: 0x1c1c2e, ambInt: 0.74, dirInt: 0.98 },
+  ARRIVED:  { ambColor: 0x202030, ambInt: 0.85, dirInt: 0.90 },
 };
 
 export class CabinScene {
@@ -31,14 +31,14 @@ export class CabinScene {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.22;
 
     this.scene  = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x05050f, 0.16);
+    this.scene.fog = new THREE.FogExp2(0x0a0a18, 0.13);
 
-    this.camera = new THREE.PerspectiveCamera(68, 1, 0.01, 30);
+    this.camera = new THREE.PerspectiveCamera(72, 1, 0.01, 30);
     this.camera.position.set(0, 0.9, 0);
-    this.camera.lookAt(0, 0.85, -2.5);
+    this.camera.lookAt(0, 0.80, -2.5);
 
     this._buildLighting();
 
@@ -56,28 +56,39 @@ export class CabinScene {
   }
 
   _buildLighting() {
-    this.ambLight = new THREE.AmbientLight(0x2a2860, 0.55);
+    // Ambient — neutral dark (cabin LEDs provide character lighting)
+    this.ambLight = new THREE.AmbientLight(0x1e1e30, 0.72);
     this.scene.add(this.ambLight);
 
-    this.dirLight = new THREE.DirectionalLight(0xfff5e0, 1.0);
-    this.dirLight.position.set(2, 4, 3);
+    // Main directional — warm daylight from window side (left/above)
+    this.dirLight = new THREE.DirectionalLight(0xfff8f0, 1.0);
+    this.dirLight.position.set(-2.5, 3.5, 1.5);
     this.scene.add(this.dirLight);
 
-    this.consoleLamp = new THREE.PointLight(0xffe4a0, 0.75, 3.5);
-    this.consoleLamp.position.set(0.88, 1.08, -0.3);
+    // Overhead LED strip light — warm amber, runs along ceiling centreline
+    this.ceilLamp = new THREE.PointLight(0xffd880, 0.55, 5.5);
+    this.ceilLamp.position.set(0, 2.0, -1.5);
+    this.scene.add(this.ceilLamp);
+
+    // Console under-light glow — signature amber LED strip
+    this.consoleLamp = new THREE.PointLight(0xff9820, 0.80, 2.8);
+    this.consoleLamp.position.set(0.72, 0.60, -0.55);
     this.scene.add(this.consoleLamp);
 
-    this.overheadMood = new THREE.PointLight(0x4060ff, 0.2, 4.5);
-    this.overheadMood.position.set(0, 1.88, -0.5);
-    this.scene.add(this.overheadMood);
-
-    this.ifeGlow = new THREE.PointLight(0xf0c040, 0.25, 3.0);
-    this.ifeGlow.position.set(0, 0.9, -1.6);
+    // IFE screen glow (blue-white)
+    this.ifeGlow = new THREE.PointLight(0xc8d8ff, 0.30, 2.8);
+    this.ifeGlow.position.set(0.04, 1.30, -1.52);
     this.scene.add(this.ifeGlow);
 
-    const fill = new THREE.PointLight(0xa0b8ff, 0.14, 5);
-    fill.position.set(-1.0, 1.2, -1.0);
-    this.scene.add(fill);
+    // Window fill — cool blue-white light from left (daylight through windows)
+    const winFill = new THREE.PointLight(0xb8d0f0, 0.22, 4.5);
+    winFill.position.set(-1.35, 1.1, -1.0);
+    this.scene.add(winFill);
+
+    // Soft warm fill from below seat (uplight from footwell LED)
+    const footFill = new THREE.PointLight(0xffa030, 0.06, 1.8);
+    footFill.position.set(-0.55, 0.08, -1.8);
+    this.scene.add(footFill);
   }
 
   _applyLighting(p) {
