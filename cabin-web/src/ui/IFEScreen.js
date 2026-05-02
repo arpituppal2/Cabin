@@ -166,17 +166,21 @@ export class IFEScreen {
     if (!content) return;
     this._destroyMap();
     this._tailCanvas = null; this._tailCtx = null;
+    content.style.display = '';
+    content.style.flexDirection = '';
 
     if (mode === 'map') {
+      content.style.display = 'flex';
+      content.style.flexDirection = 'column';
       content.innerHTML = `
-        <div id="ife-map" style="width:100%;height:calc(100% - 52px);"></div>
+        <div id="ife-map" style="flex:1;min-height:0;width:100%;background:#0a1628;"></div>
         <div class="ife-telemetry-bar">
           <span>TIME TO DEST <strong id="tel-ttd">--:--</strong></span>
           <span>ALT <strong id="tel-alt">-- ft</strong></span>
           <span>SPD <strong id="tel-spd">-- kts</strong></span>
           <span>OAT <strong id="tel-oat">--°C</strong></span>
         </div>`;
-      requestAnimationFrame(() => this._initLeafletMap());
+      setTimeout(() => this._initLeafletMap(), 350);
 
     } else if (mode === 'clock') {
       const s = this.session.state;
@@ -204,15 +208,27 @@ export class IFEScreen {
   }
 
   _initLeafletMap() {
-    if (!window.L || !this._el) return;
+    if (!window.L) {
+      console.warn('[IFE] window.L not available — Leaflet not loaded');
+      return;
+    }
+    if (!this._el) return;
     const mapEl = this._el.querySelector('#ife-map');
-    if (!mapEl) return;
+    if (!mapEl) { console.warn('[IFE] #ife-map not found'); return; }
+
+    const mapH = mapEl.offsetHeight;
+    console.log('[IFE] initLeafletMap — container h=' + mapH);
+    if (mapH < 10) {
+      console.warn('[IFE] map container too small, retrying in 200ms');
+      setTimeout(() => this._initLeafletMap(), 200);
+      return;
+    }
 
     const route  = this.session.state.route;
-    const origin = AIRPORTS[route.origin];
-    const dest   = AIRPORTS[route.destination];
+    const origin = route && AIRPORTS[route.origin];
+    const dest   = route && AIRPORTS[route.destination];
     if (!origin || !dest) {
-      mapEl.innerHTML = '<div style="color:#f0c040;padding:20px;font-family:Inter,sans-serif;font-size:12px;">Route data unavailable.</div>';
+      mapEl.innerHTML = '<div style="color:#f0c040;padding:20px;font-family:Inter,sans-serif;font-size:13px;letter-spacing:0.06em;">No route selected.</div>';
       return;
     }
 
@@ -221,7 +237,7 @@ export class IFEScreen {
 
     const map = L.map(mapEl, {
       zoomControl: false, attributionControl: false,
-      dragging: false, scrollWheelZoom: false,
+      dragging: true, scrollWheelZoom: false,
       doubleClickZoom: false, touchZoom: false
     });
     this._leafletMap = map;
@@ -229,6 +245,7 @@ export class IFEScreen {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       subdomains: 'abcd', maxZoom: 19
     }).addTo(map);
+    map.once('load', () => { setTimeout(() => map.invalidateSize(), 50); });
 
     const originIcon = L.divIcon({
       className: '', iconSize: [12, 12], iconAnchor: [6, 6],
@@ -265,6 +282,7 @@ export class IFEScreen {
       L.latLngBounds([[origin.lat, origin.lon], [dest.lat, dest.lon]]),
       { padding: [50, 50] }
     );
+    setTimeout(() => { if (this._leafletMap) this._leafletMap.invalidateSize(); }, 100);
 
     this._updateMapProgress(this._telemetry.progress || 0);
   }
