@@ -280,25 +280,50 @@ export class AudioEngine {
     if (!('speechSynthesis' in window)) return;
     speechSynthesis.cancel();
 
-    const doSpeak = () => {
-      const utter = new SpeechSynthesisUtterance(text);
-      const voices = speechSynthesis.getVoices();
+    // Play chime first, then wait for it to finish before speaking
+    this.playChime();
 
-      // Prefer natural-sounding voices (Google, premium OS voices)
-      const preferred = voices.find(v =>
-        /Google UK English Female|Google US English|Samantha|Karen|Moira|Fiona|Daniel|Serena|Ava/.test(v.name)
-      ) || voices.find(v => v.lang === 'en-GB') || voices.find(v => v.lang === 'en-US') || voices[0];
+    const speakWithVoices = (voices) => {
+      const utter = new SpeechSynthesisUtterance(text);
+
+      // Priority: Google UK Female → Google US → macOS Samantha/Karen/Ava → any en-GB → any en-US → first available
+      const preferred =
+        voices.find(v => v.name === 'Google UK English Female') ||
+        voices.find(v => v.name === 'Google US English') ||
+        voices.find(v => /Samantha|Karen|Ava|Serena|Moira|Fiona/.test(v.name)) ||
+        voices.find(v => v.lang === 'en-GB') ||
+        voices.find(v => v.lang === 'en-US') ||
+        voices.find(v => v.lang.startsWith('en')) ||
+        voices[0];
 
       if (preferred) utter.voice = preferred;
-      utter.rate   = 0.86;
-      utter.pitch  = 1.02;
-      utter.volume = 0.78;
-      speechSynthesis.speak(utter);
+      utter.rate   = 0.88;
+      utter.pitch  = 1.05;
+      utter.volume = 0.82;
+      setTimeout(() => speechSynthesis.speak(utter), 0); // yield so browser doesn't block
     };
 
-    // Play chime first, then speak
-    this.playChime();
-    setTimeout(doSpeak, 680);
+    const trySpeak = () => {
+      const voices = speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        speakWithVoices(voices);
+      } else {
+        // Voices not yet loaded — wait for the event, then speak
+        const onReady = () => {
+          speechSynthesis.removeEventListener('voiceschanged', onReady);
+          speakWithVoices(speechSynthesis.getVoices());
+        };
+        speechSynthesis.addEventListener('voiceschanged', onReady);
+        // Safety fallback: if event never fires, try anyway after 1s
+        setTimeout(() => {
+          speechSynthesis.removeEventListener('voiceschanged', onReady);
+          speakWithVoices(speechSynthesis.getVoices());
+        }, 1000);
+      }
+    };
+
+    // Delay speaking until after the chime has played (~700ms)
+    setTimeout(trySpeak, 700);
   }
 
   playSprintEnd() {

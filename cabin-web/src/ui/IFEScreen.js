@@ -237,10 +237,14 @@ export class IFEScreen {
 
     const map = L.map(mapEl, {
       zoomControl: false, attributionControl: false,
-      dragging: true, scrollWheelZoom: false,
-      doubleClickZoom: false, touchZoom: false
+      dragging: true, scrollWheelZoom: true,
+      doubleClickZoom: true, touchZoom: true,
+      wheelPxPerZoomLevel: 80
     });
     this._leafletMap = map;
+
+    // Zoom controls — positioned bottom-right so they don't cover the route label
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       subdomains: 'abcd', maxZoom: 19

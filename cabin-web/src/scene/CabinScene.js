@@ -31,21 +31,24 @@ export class CabinScene {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.22;
+    this.renderer.toneMappingExposure = 1.25;
 
     this.scene  = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x0a0a18, 0.13);
+    this.scene.fog = new THREE.FogExp2(0x08081a, 0.11);
 
-    this.camera = new THREE.PerspectiveCamera(72, 1, 0.01, 30);
-    this.camera.position.set(0, 0.9, 0);
-    this.camera.lookAt(0, 0.80, -2.5);
+    // Wide-angle immersive FOV — shows the full cabin, windows clearly on each side
+    this.camera = new THREE.PerspectiveCamera(110, 1, 0.01, 30);
+    this.camera.position.set(0, 0.88, 0);
+    this.camera.lookAt(0, 0.76, -2.5);
 
     this._buildLighting();
 
-    this.windowView   = new WindowView();
+    this.windowView   = new WindowView(this.seatId);
     this.cabinGeometry = new CabinGeometry(this.scene, this.windowView, this.seatId);
     this.cameraRig    = new CameraRig(this.camera, this.canvas);
-    this.cameraRig.basePosition.set(0, 0.9, 0);
+    this.cameraRig.basePosition.set(0, 0.88, 0);
+    // Cached colour objects — avoids per-frame GC pressure
+    this._lerpAmbColor = new THREE.Color();
 
     const lp = PHASE_LIGHTING.BOARDING;
     this._curLighting = { ...lp };
@@ -140,7 +143,9 @@ export class CabinScene {
       const t  = this._lerpT;
       const c  = this._curLighting, tg = this._tgtLighting;
       if (this.ambLight) {
-        this.ambLight.color.lerp(new THREE.Color(tg.ambColor), t * 0.1);
+        // Reuse cached colour — no GC churn every frame
+        this._lerpAmbColor.setHex(tg.ambColor);
+        this.ambLight.color.lerp(this._lerpAmbColor, t * 0.1);
         this.ambLight.intensity = c.ambInt + (tg.ambInt - c.ambInt) * t;
       }
       if (this.dirLight) {
