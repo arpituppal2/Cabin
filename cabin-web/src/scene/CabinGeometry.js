@@ -84,7 +84,8 @@ export class CabinGeometry {
       roughness, metalness,
       map: map || null,
       emissive: new THREE.Color(emissiveColor),
-      emissiveIntensity: emissive
+      emissiveIntensity: emissive,
+      side: THREE.DoubleSide
     });
   }
 
@@ -167,22 +168,45 @@ export class CabinGeometry {
     const screenCanvas = document.createElement('canvas');
     screenCanvas.width = 480; screenCanvas.height = 300;
     const sctx = screenCanvas.getContext('2d');
-    sctx.fillStyle = '#0a0a18';
+    sctx.fillStyle = '#080814';
     sctx.fillRect(0, 0, 480, 300);
+    const grad = sctx.createLinearGradient(0, 0, 0, 300);
+    grad.addColorStop(0, '#0a1428');
+    grad.addColorStop(1, '#060610');
+    sctx.fillStyle = grad;
+    sctx.fillRect(0, 0, 480, 300);
+    sctx.strokeStyle = 'rgba(240,192,64,0.4)';
+    sctx.lineWidth = 2;
+    sctx.strokeRect(12, 12, 456, 276);
+    sctx.strokeStyle = 'rgba(240,192,64,0.15)';
+    sctx.lineWidth = 1;
+    sctx.strokeRect(18, 18, 444, 264);
     sctx.fillStyle = '#f0c040';
-    sctx.font = 'bold 22px sans-serif';
+    sctx.font = 'bold 48px sans-serif';
     sctx.textAlign = 'center';
-    sctx.fillText('CABIN', 240, 150);
+    sctx.textBaseline = 'middle';
+    sctx.shadowColor = '#f0c040';
+    sctx.shadowBlur = 20;
+    sctx.fillText('CABIN', 240, 110);
+    sctx.shadowBlur = 0;
+    sctx.fillStyle = 'rgba(240,192,64,0.55)';
+    sctx.font = '500 15px sans-serif';
+    sctx.letterSpacing = '0.2em';
+    sctx.fillText('CLICK TO OPEN IFE', 240, 175);
+    sctx.fillStyle = 'rgba(255,255,255,0.15)';
+    sctx.font = '12px sans-serif';
+    sctx.fillText('In-Flight Entertainment & Productivity', 240, 210);
     const screenTex = new THREE.CanvasTexture(screenCanvas);
 
     const screenMat = new THREE.MeshStandardMaterial({
       map: screenTex,
-      emissive: new THREE.Color('#102040'),
-      emissiveIntensity: 0.5,
-      roughness: 0.2
+      emissive: new THREE.Color('#1a3a6e'),
+      emissiveIntensity: 1.4,
+      roughness: 0.05,
+      side: THREE.DoubleSide
     });
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.82, 0.52), screenMat);
-    screen.position.set(0, 0.55, -1.348);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.84, 0.54), screenMat);
+    screen.position.set(0, 0.55, -1.346);
     this.scene.add(screen);
     this.meshes.ifeScreen = screen;
     this.meshes.ifeScreenTex = screenTex;
@@ -195,7 +219,7 @@ export class CabinGeometry {
   _buildConsole(windowSide) {
     const consoleMat = new THREE.MeshStandardMaterial({
       map: makeMarbleTexture(),
-      roughness: 0.3, metalness: 0.05
+      roughness: 0.3, metalness: 0.05, side: THREE.DoubleSide
     });
     const console_ = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.55, 0.7), consoleMat);
     console_.position.set(-windowSide * 0.62, -0.45, -0.5);
@@ -211,8 +235,8 @@ export class CabinGeometry {
     const labels = ['UP', 'LG', 'BD', 'LB'];
     labels.forEach((lbl, i) => {
       const btn = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.025, 0.025, 0.012, 12),
-        this._mat('#38383e', 0.5, 0.3, null, 0.04, '#c8a96e')
+        new THREE.CylinderGeometry(0.04, 0.04, 0.014, 14),
+        this._mat('#38383e', 0.5, 0.3, null, 0.06, '#c8a96e')
       );
       btn.position.set(-windowSide * 0.62, -0.14, -0.62 + i * 0.065);
       btn.rotation.x = Math.PI / 2;
@@ -227,7 +251,7 @@ export class CabinGeometry {
   _buildTrayTable() {
     const woodTex = makeWoodTexture();
     const trayMat = new THREE.MeshStandardMaterial({
-      map: woodTex, roughness: 0.8, metalness: 0.0
+      map: woodTex, roughness: 0.8, metalness: 0.0, side: THREE.DoubleSide
     });
     const tray = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.025, 0.42), trayMat);
     tray.position.set(0, -0.32, -1.15);

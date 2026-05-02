@@ -1,0 +1,214 @@
+The current build has four critical failures. Fix all four completely. Do not patch — rewrite the broken modules from scratch.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAILURE 1: ROUTE SELECTOR — Replace the dropdown with a 3D interactive globe
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Remove the <select> dropdown for route selection entirely.
+
+Replace it with a Three.js globe rendered in a dedicated <canvas id="globe-canvas"> inside the onboarding screen. This globe must:
+
+GLOBE GEOMETRY:
+- SphereGeometry(1, 64, 64) as the base earth sphere
+- Apply a canvas-generated earth texture: draw simplified continent outlines as filled dark teal polygons on a deep navy canvas (#0a1628 ocean, #1a2d3a land). Use these approximate Mercator polygon coords for the 7 major landmasses — hardcode them as arrays of [lon, lat] pairs and convert to UV coordinates (u = (lon+180)/360, v = (lat+90)/180 flipped). Draw with ctx.beginPath() / ctx.fill(). This is all canvas 2D — no external texture files.
+- Rotate slowly and continuously (0.001 rad/frame on Y axis) when idle
+- User can drag to rotate: pointerdown + pointermove rotates the globe quaternion
+
+AIRPORT MARKERS:
+Place a glowing dot marker on the globe for every airport in this list. Convert lat/lon to 3D position using:
+  const phi = (90 - lat) * Math.PI / 180;
+  const theta = (lon + 180) * Math.PI / 180;
+  const x = -radius * Math.sin(phi) * Math.cos(theta);
+  const y = radius * Math.cos(phi);
+  const z = radius * Math.sin(phi) * Math.sin(theta);
+
+Airports (include all of these — lat/lon provided):
+LAX (33.94, -118.41), JFK (40.64, -73.78), LHR (51.48, -0.45), CDG (49.01, 2.55),
+NRT (35.76, 140.39), SIN (1.36, 103.99), DXB (25.25, 55.36), SYD (-33.95, 151.18),
+HKG (22.31, 113.91), ORD (41.98, -87.90), MIA (25.79, -80.29), GRU (-23.43, -46.47),
+FRA (50.04, 8.57), AMS (52.31, 4.77), ICN (37.46, 126.44), BOM (19.09, 72.87),
+MEX (19.44, -99.07), EZE (-34.82, -58.54), CPT (-33.97, 18.60), NBO (-1.32, 36.93),
+YYZ (43.68, -79.63), BKK (13.68, 100.75), ZRH (47.45, 8.55), FCO (41.80, 12.24)
+
+Each marker is a small THREE.Sprite with a canvas-generated circle texture:
+- Outer glow ring: rgba(240, 192, 64, 0.3), radius 12px
+- Inner dot: solid #f0c040, radius 4px
+- Always faces camera (Sprite handles this automatically)
+- Scale: 0.035
+
+INTERACTION:
+- On hover (raycaster against sprites): enlarge the hovered sprite to scale 0.055, show a tooltip HTML div with: airport code, city name, and "from [USER'S SELECTED ORIGIN]: Xh Ym" flight time
+- The "selected origin" starts as null. First click on a marker sets it as ORIGIN (highlight bright amber). Second click on a different marker sets it as DESTINATION (highlight green #40e060). A curved glowing arc animates between origin and destination (THREE.Line with CatmullRomCurve3 through intermediate sphere-surface points, color #f0c040, 64 segments). Show flight time prominently below the globe: "LAX → LHR · 10h 20m · 5,456 nm"
+- Clicking the origin again deselects and resets
+- When both are selected, the globe smoothly rotates to show the arc between them centered in view
+
+TOOLTIP HTML (position absolutely over the canvas, shown/hidden via JS):
+  <div id="globe-tooltip" style="position:absolute; background:#16161a; border:1px solid rgba(240,192,64,0.4); 
+  color:#e8e6f0; padding:10px 14px; border-radius:6px; pointer-events:none; font-family:'Inter',sans-serif; 
+  font-size:13px; display:none; z-index:100;">
+    <div style="font-size:18px; font-weight:600; color:#f0c040;">[CODE]</div>
+    <div>[City Name]</div>
+    <div style="color:#7a7888; margin-top:4px;" id="tooltip-flight-time"></div>
+  </div>
+
+Put the globe canvas at the top of the onboarding flow, before seat selection. It should be 500px tall, full width of the card, dark background.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAILURE 2: CAMERA — User must be IN the seat, looking FORWARD, not at it
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The camera is currently positioned BEHIND and ABOVE the seat, looking at it like a third-person game. This is completely wrong.
+
+CORRECT CAMERA POSITION: The camera is the user's head, seated in the business class chair, looking forward at the IFE screen.
+
+In CabinGeometry.js, all geometry must be built relative to a camera that sits at approximately:
+  cameraPosition = new THREE.Vector3(0, 0.9, 0)
+  cameraLookAt = new THREE.Vector3(0, 0.85, -2.5)
+
+This means:
+- The IFE screen should be directly in front of the camera at Z = -1.8, centered
+- The side console should be to the RIGHT of the camera at X = +0.6 to +1.0
+- The window should be to the LEFT of the camera at X = -1.2 to -2.0 (for seat 1A)
+- The tray table, when deployed, slides out from the IFE column to land horizontal in front of you (Z = -0.8, Y = 0.6)
+- The overhead bins should be ABOVE at Y = 1.6 to 2.0
+- The seat back (the back of the chair) is BEHIND and below the camera — only slightly visible at the very bottom periphery of the screen
+- The floor/footwell is below and in front (Y = 0 to 0.3, Z = -0.3 to -1.0)
+
+The user should feel like they are sitting in the seat, looking at their own private little suite. Like the United Polaris seat from a passenger's POV.
+
+DO NOT show the seat from behind or above. DO NOT show the full seat shell as a visible object in front of the camera. The seat is what the user is IN.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAILURE 3: OUTSIDE WINDOW VIEW — Add a real procedural sky visible through the window
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+There is currently no outside view through the window. Fix this completely.
+
+The window is a PlaneGeometry at X = -1.4, Y = 0.9, Z = -0.5, rotated 15° inward (so it faces slightly toward camera), approximately 0.7 wide × 0.5 tall, oval-ish (use an oval mask via canvas clip path).
+
+Create a dedicated <canvas id="window-canvas" width="512" height="512" style="display:none"> and update it every frame. Apply it as a THREE.CanvasTexture (set needsUpdate = true each frame) on the window PlaneGeometry.
+
+DRAW THE SKY on window-canvas each frame in WindowView.js:
+
+Phase-based sky gradient (ctx.createLinearGradient top to bottom):
+- BOARDING/TAXI (early morning): top #0a0520 → mid #1a1060 → bottom #f08030
+- TAKEOFF (dawn): top #0a2060 → mid #4060c0 → bottom #e06020
+- CRUISE day: top #020a2a → mid #0a3080 → bottom #60a8e0
+- CRUISE golden hour: top #200820 → mid #c04020 → bottom #f0a030
+- CRUISE night: top #000005 → mid #050515 → bottom #0a0a20 (add 80 white dots for stars using ctx.fillRect(randomX, randomY, 1.5, 1.5))
+- DESCENT: top #0a2060 → mid #6090c0 → bottom #c8a870 (ground tones)
+- LANDING: top #4080c0 → mid #80b0d0 → bottom #a09060
+
+CLOUD LAYER on top of sky gradient:
+- Maintain an array of 12 cloud objects: { x, y, width, height, opacity, speed }
+- Initialize with random values across the 512px canvas
+- Each frame: cloud.x -= cloud.speed * deltaTime * 20; if (cloud.x + cloud.width < 0) reset to x = 520, random y
+- Draw each cloud as a series of overlapping ctx.arc() circles, fill white with cloud.opacity (0.4–0.75):
+  for each cloud: draw 5 circles of varying radius (20–60px) in a horizontal cluster
+
+TURBULENCE during cruise: every 45–90 seconds (random interval), for 8 seconds, add a subtle camera position offset:
+  camera.position.x += Math.sin(time * 8) * 0.003
+  camera.position.y += Math.cos(time * 6) * 0.002
+
+The window plane should have these material properties:
+  MeshBasicMaterial({ map: windowTexture, side: THREE.FrontSide })
+  No lighting affects the window — it should always show the sky at full brightness.
+
+Also draw a subtle window frame: 4 BoxGeometry pieces forming a rectangular frame around the window opening, brushed aluminum material.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FAILURE 4: BUTTONS — Every interactive element must actually work
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Nothing is interactive right now. Fix all of the following:
+
+IFE SCREEN (the big panel in front of you):
+- Click it → open the IFE overlay panel (HTML div that appears over the canvas)
+- The panel shows 4 mode tabs at the bottom: MAP | CLOCK | TASKS | TAIL CAM
+- MAP mode: show the 2D flight map canvas (same as described in original prompt — Mercator map, arc, plane icon, telemetry bar)
+- CLOCK mode: show the Pomodoro sprint countdown in huge Instrument Serif font
+- TASKS mode: show a task list with an input box to type and press Enter to add tasks; click tasks to mark done
+- TAIL CAM mode: animated sky canvas (scrolling clouds from below) with "TAIL CAM" label and blinking REC dot
+- Close button (×) dismisses and returns to 3D view
+
+TRAY TABLE:
+- Click the tray table console (the black rectangle below the IFE) → animate it deploying: lerp its Y rotation from -Math.PI/2 (vertical, stowed) to 0 (horizontal, deployed) over 0.4 seconds. Play a "thunk" sound.
+- When deployed, a notebook mesh appears on it (a thin BoxGeometry, cream color #f5f0e8)
+- Click the notebook → open the Notebook HTML panel (textarea styled as a paper notepad)
+- Click the tray table again → stow it (reverse animation)
+
+SEAT CONSOLE BUTTONS (the 4 cylinder discs):
+- Click any button → the button disc sinks 2mm (Y position -= 0.002), returns after 0.1s (animation)
+- Play a soft click sound (AudioEngine.playClick())
+- Button labels: implement as a tiny HTML tooltip that appears on hover: "Upright", "Lounge", "Bed", "Lumbar"
+- Clicking "Bed" changes the ambient light slightly warmer/dimmer (simulate lie-flat mood)
+
+STORAGE CUBBY (small box with sliding door on the console):
+- Click it → animate the door sliding open (lerp X position of door mesh by 0.1 units over 0.25s)
+- Reveal: Evian bottle (cylinder, light blue #c8e6f5) and headphone silhouette (two small tori connected by a bar)
+- Click headphones → toggle AudioEngine master gain between 1.0 and 0 (mute/unmute), show a small "Audio ON/OFF" toast
+
+AUDIO: All sounds use Web Audio API. No audio files. Synthesize everything:
+- Engine hum: two OscillatorNodes (sawtooth, 88Hz and 176Hz) → GainNode → BiquadFilter (lowpass 350Hz) → destination. Start on boarding, ramp gain 0→0.4 over takeoff, steady 0.4 during cruise.
+- Tray clunk: BufferSourceNode with 0.15s of Math.random()*2-1 noise, bandpass filter 200–600Hz, gain envelope 0→0.8→0 over 0.15s
+- Button click: BufferSourceNode with 0.02s noise, highpass 2000Hz, gain 0→0.3→0 over 0.02s
+- Seatbelt chime: two OscillatorNodes (sine, 880Hz for 0.3s then 1108Hz for 0.3s), gain ramp 0→0.4→0
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALSO FIX: MATERIALS — No more grey/white cubes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every mesh must have a proper MeshStandardMaterial. Replace all placeholder grey MeshBasicMaterials:
+
+- IFE bezel: color #0d0d0f, roughness 0.9, metalness 0.05
+- IFE screen face: MeshBasicMaterial, color #000820 (default off state), emissive when IFE is active → switch to color #050a1a with emissiveIntensity 0.8, emissive #1a3060
+- Console surface: color #c8c0b8, roughness 0.25, metalness 0.08 (faux marble — light grey with slight warmth)
+- Console buttons: color #2a2a3a, roughness 0.4, metalness 0.6 (capacitive dark metal look)
+- Tray table top: color #5a3520, roughness 0.82, metalness 0.0 (walnut)
+- Tray table underside: color #1a1a1e, roughness 0.9 (dark plastic)
+- Overhead bin: color #b0adb8, roughness 0.55, metalness 0.1
+- Carpet floor: color #1e1e2a, roughness 1.0, metalness 0.0
+- Window frame: color #8a8a9a, roughness 0.35, metalness 0.75 (brushed aluminum)
+- Side wall panels: color #1c1c24, roughness 0.7, metalness 0.05 (dark cabin wall)
+- Seat headrest visible at bottom periphery: color #1a1a20, roughness 0.65
+
+LIGHTING:
+Add these lights if not already present:
+- DirectionalLight(#fff5e0, 1.2) at position (2, 4, 3) — main cabin ceiling light
+- AmbientLight(#2a2860, 0.3) — cool fill
+- PointLight(#ffe4a0, 0.6) at (0.8, 1.0, 0) — console side lamp (warm personal light)
+- PointLight(#4060ff, 0.15) at (0, 1.8, -0.5) — subtle overhead mood light (aircraft mood lighting)
+- PointLight(#f0c040, 0.2) at (0, 0.9, -1.6) — IFE screen ambient glow
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VERIFICATION CHECKLIST — Do not stop until all pass
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After rebuilding, verify each item works by testing it:
+
+[ ] Globe renders in onboarding with glowing airport dots
+[ ] Hovering an airport dot shows tooltip with flight time from selected origin
+[ ] Clicking first airport highlights it amber as origin
+[ ] Clicking second airport draws an animated arc and shows flight info below globe
+[ ] "BOARD FLIGHT" only activates after both origin and destination are selected
+[ ] After boarding, camera is INSIDE the seat looking forward at the IFE screen
+[ ] The IFE screen is visible directly ahead, roughly centered, large
+[ ] The side console with buttons is visible to the right
+[ ] The window is visible to the left with an animated sky and moving clouds
+[ ] The floor/footwell is visible at the bottom of the view
+[ ] Dragging the mouse pans the view (±60° horizontal, ±30° vertical)
+[ ] Clicking the IFE opens the panel overlay with MAP/CLOCK/TASKS/TAIL CAM tabs
+[ ] Tasks tab: can type a task and press Enter to add it
+[ ] Clock tab: shows countdown timer in large Instrument Serif font
+[ ] Closing IFE (×) returns to 3D cabin view
+[ ] Clicking the tray table plays a sound and animates it deploying horizontally
+[ ] After deploy, notebook appears on tray table
+[ ] Clicking notebook opens the notebook editor panel
+[ ] Clicking console buttons sinks them visually and plays a click sound
+[ ] Clicking the cubby opens the door and reveals Evian + headphones
+[ ] Clicking headphones toggles audio mute
+[ ] Engine hum plays and increases in intensity from boarding through takeoff
+[ ] Seatbelt chime plays when the sign toggles
+[ ] The sky through the window changes color as flight phases progress
+[ ] Clouds animate across the window canvas
+[ ] No placeholder grey boxes remain anywhere in the scene

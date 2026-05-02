@@ -4,15 +4,15 @@ import { WindowView } from './WindowView.js';
 import { CameraRig } from './CameraRig.js';
 
 const PHASE_LIGHTING = {
-  ONBOARDING: { dirColor: 0xfff5e0, dirIntensity: 1.2, ambColor: 0xd0d8e8, ambIntensity: 0.5 },
-  BOARDING:   { dirColor: 0xfff5f0, dirIntensity: 1.2, ambColor: 0xd0d8e8, ambIntensity: 0.5 },
-  TAXI:       { dirColor: 0x8090d0, dirIntensity: 0.9, ambColor: 0x303860, ambIntensity: 0.4 },
-  TAKEOFF:    { dirColor: 0x9090e0, dirIntensity: 1.0, ambColor: 0x404870, ambIntensity: 0.4 },
-  CRUISE:     { dirColor: 0xfff5e0, dirIntensity: 0.6, ambColor: 0x202840, ambIntensity: 0.3 },
-  BREAK:      { dirColor: 0xfff5e0, dirIntensity: 0.6, ambColor: 0x202840, ambIntensity: 0.3 },
-  DESCENT:    { dirColor: 0xffa860, dirIntensity: 1.0, ambColor: 0x503020, ambIntensity: 0.4 },
-  LANDING:    { dirColor: 0xffe8c0, dirIntensity: 1.1, ambColor: 0x604030, ambIntensity: 0.45 },
-  ARRIVED:    { dirColor: 0xfff5f0, dirIntensity: 1.2, ambColor: 0xd0d8e8, ambIntensity: 0.5 }
+  ONBOARDING: { dirColor: 0xfff5e0, dirIntensity: 1.6, ambColor: 0xd0d8e8, ambIntensity: 0.9 },
+  BOARDING:   { dirColor: 0xfff5f0, dirIntensity: 1.6, ambColor: 0xd0d8e8, ambIntensity: 0.9 },
+  TAXI:       { dirColor: 0x8090d0, dirIntensity: 1.1, ambColor: 0x303860, ambIntensity: 0.6 },
+  TAKEOFF:    { dirColor: 0x9090e0, dirIntensity: 1.2, ambColor: 0x404870, ambIntensity: 0.6 },
+  CRUISE:     { dirColor: 0xfff5e0, dirIntensity: 0.9, ambColor: 0x202840, ambIntensity: 0.5 },
+  BREAK:      { dirColor: 0xfff5e0, dirIntensity: 0.9, ambColor: 0x202840, ambIntensity: 0.5 },
+  DESCENT:    { dirColor: 0xffa860, dirIntensity: 1.3, ambColor: 0x503020, ambIntensity: 0.6 },
+  LANDING:    { dirColor: 0xffe8c0, dirIntensity: 1.4, ambColor: 0x604030, ambIntensity: 0.65 },
+  ARRIVED:    { dirColor: 0xfff5f0, dirIntensity: 1.6, ambColor: 0xd0d8e8, ambIntensity: 0.9 }
 };
 
 export class CabinScene {
@@ -130,6 +130,7 @@ export class CabinScene {
   }
 
   startRender() {
+    this._onResize();
     this._lastTime = performance.now();
     const loop = (time) => {
       this._animId = requestAnimationFrame(loop);
@@ -138,7 +139,7 @@ export class CabinScene {
       this._update(dt);
       this.renderer.render(this.scene, this.camera);
     };
-    requestAnimationFrame(loop);
+    this._animId = requestAnimationFrame(loop);
   }
 
   _update(dt) {

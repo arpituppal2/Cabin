@@ -35,6 +35,7 @@ export class Hotspots {
   _onMove(e) {
     if (!this._enabled) return;
     const ndc = this._getMouseNDC(e);
+    this.camera.updateMatrixWorld();
     this.raycaster.setFromCamera(ndc, this.camera);
     const meshes = this.cabinGeometry.hotspotMeshes.filter(m => m.visible !== false);
     const hits = this.raycaster.intersectObjects(meshes, false);
@@ -59,9 +60,11 @@ export class Hotspots {
   _onClick(e) {
     if (!this._enabled) return;
     const ndc = this._getMouseNDC(e);
+    this.camera.updateMatrixWorld();
     this.raycaster.setFromCamera(ndc, this.camera);
     const meshes = this.cabinGeometry.hotspotMeshes.filter(m => m.visible !== false);
     const hits = this.raycaster.intersectObjects(meshes, false);
+    console.log('[CABIN] click ndc=(' + ndc.x.toFixed(2) + ',' + ndc.y.toFixed(2) + ') meshes=' + meshes.length + ' hits=' + hits.length + (hits.length ? ' → ' + hits[0].object.userData.hotspot : ''));
     if (hits.length > 0) {
       const mesh = hits[0].object;
       const hotspot = mesh.userData.hotspot;
