@@ -49,10 +49,10 @@ export class CabinScene {
     this.renderer.shadowMap.enabled = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.8;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x0d0d10, 5, 14);
+    this.scene.fog = new THREE.Fog(0x0d0d10, 10, 22);
 
     this.camera = new THREE.PerspectiveCamera(
       65,
@@ -60,14 +60,14 @@ export class CabinScene {
       0.01,
       30
     );
-    this.camera.position.set(0, 0.05, 0);
+    this.camera.position.set(0, 0.55, 0);
 
     this._buildLighting();
 
     this.windowView = new WindowView();
     this.cabinGeometry = new CabinGeometry(this.scene, this.windowView, this.seatId);
     this.cameraRig = new CameraRig(this.camera, this.canvas);
-    this.cameraRig.basePosition.set(0, 0.05, 0);
+    this.cameraRig.basePosition.set(0, 0.55, 0);
 
     this._currentLighting = { ...PHASE_LIGHTING.BOARDING };
     this._targetLighting = { ...PHASE_LIGHTING.BOARDING };
@@ -77,22 +77,30 @@ export class CabinScene {
   }
 
   _buildLighting() {
-    this.dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
-    this.dirLight.position.set(2, 4, 2);
+    this.dirLight = new THREE.DirectionalLight(0xfff5e0, 1.5);
+    this.dirLight.position.set(1, 3, 1);
     this.scene.add(this.dirLight);
 
-    this.ambLight = new THREE.AmbientLight(0xd0d8e8, 0.5);
+    this.ambLight = new THREE.AmbientLight(0xd0d8e8, 0.9);
     this.scene.add(this.ambLight);
 
-    this.ifeLight = new THREE.PointLight(0x2040c0, 0.2, 2);
-    this.ifeLight.position.set(0, 0.55, -1.1);
+    this.overheadA = new THREE.PointLight(0xfff8f0, 1.8, 4.0);
+    this.overheadA.position.set(0, 1.4, -0.5);
+    this.scene.add(this.overheadA);
+
+    this.overheadB = new THREE.PointLight(0xfff8f0, 1.0, 5.0);
+    this.overheadB.position.set(0, 1.4, -1.8);
+    this.scene.add(this.overheadB);
+
+    this.ifeLight = new THREE.PointLight(0x4080c0, 0.35, 2.5);
+    this.ifeLight.position.set(0, 0.55, -1.05);
     this.scene.add(this.ifeLight);
 
-    this.cubbyLight = new THREE.PointLight(0xffe4a0, 0.4, 0.8);
+    this.cubbyLight = new THREE.PointLight(0xffe4a0, 0.5, 1.2);
     this.cubbyLight.position.set(-0.62, 0.06, -0.5);
     this.scene.add(this.cubbyLight);
 
-    this.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x1a1a20, 0.15);
+    this.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x1a1a20, 0.25);
     this.scene.add(this.hemiLight);
   }
 

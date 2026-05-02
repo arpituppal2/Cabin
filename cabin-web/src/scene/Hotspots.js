@@ -58,7 +58,6 @@ export class Hotspots {
 
   _onClick(e) {
     if (!this._enabled) return;
-    if (e.target !== this.dom) return;
     const ndc = this._getMouseNDC(e);
     this.raycaster.setFromCamera(ndc, this.camera);
     const meshes = this.cabinGeometry.hotspotMeshes.filter(m => m.visible !== false);

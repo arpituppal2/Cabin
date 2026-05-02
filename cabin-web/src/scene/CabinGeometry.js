@@ -212,7 +212,7 @@ export class CabinGeometry {
     labels.forEach((lbl, i) => {
       const btn = new THREE.Mesh(
         new THREE.CylinderGeometry(0.025, 0.025, 0.012, 12),
-        this._mat('#2a2a30', 0.5, 0.3, null, 0.15, '#6080ff')
+        this._mat('#38383e', 0.5, 0.3, null, 0.04, '#c8a96e')
       );
       btn.position.set(-windowSide * 0.62, -0.14, -0.62 + i * 0.065);
       btn.rotation.x = Math.PI / 2;
